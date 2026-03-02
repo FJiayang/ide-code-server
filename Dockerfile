@@ -49,3 +49,26 @@ RUN go install golang.org/x/tools/gopls@latest \
     && go install github.com/go-delve/delve/cmd/dlv@latest \
     && go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest \
     && go install golang.org/x/tools/cmd/goimports@latest
+
+# Layer 4: Python 3.13 + uv + conda with China mirrors
+ENV UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+
+# Install Python 3.13
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.13 \
+    python3.13-venv \
+    python3.13-dev \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3.13 /usr/bin/python3 \
+    && ln -sf /usr/bin/python3 /usr/bin/python
+
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH=/root/.local/bin:/home/coder/.local/bin:$PATH
+
+# Install Miniconda
+RUN curl -fsSL https://mirrors.tuna.tsinghua.edu.cn/anaconda/miniconda/Miniconda3-latest-Linux-x86_64.sh -o /tmp/miniconda.sh \
+    && bash /tmp/miniconda.sh -b -p /opt/conda \
+    && rm /tmp/miniconda.sh
+ENV PATH=/opt/conda/bin:$PATH
