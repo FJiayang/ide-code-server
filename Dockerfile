@@ -26,3 +26,9 @@ RUN mkdir -p /etc/apt/keyrings \
     && apt-get update \
     && apt-get install -y kubectl \
     && rm -rf /var/lib/apt/lists/*
+
+# Layer 2: User permissions - sudo with su blocked
+RUN apt-get update && apt-get install -y sudo \
+    && echo "coder ALL=(ALL) NOPASSWD: ALL, !/usr/bin/su, !/bin/su" > /etc/sudoers.d/coder-nopasswd \
+    && chmod 440 /etc/sudoers.d/coder-nopasswd \
+    && rm -rf /var/lib/apt/lists/*
