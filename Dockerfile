@@ -37,6 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends sudo \
 # Layer 3: Go (latest) with China mirror and tools
 ENV GO_VERSION=1.24.0
 ENV GOPROXY=https://goproxy.cn,direct
+ENV GOPATH=/home/coder/go
 ENV PATH=/usr/local/go/bin:/home/coder/go/bin:$PATH
 
 RUN ARCH=$(dpkg --print-architecture) \
