@@ -90,3 +90,17 @@ RUN npm config set registry https://registry.npmmirror.com --global \
     && npm install -g pnpm yarn \
     && pnpm config set registry https://registry.npmmirror.com \
     && yarn config set registry https://registry.npmmirror.com
+
+# Layer 6: JDK 21 (Temurin) + Maven 3.9.x with Aliyun mirror
+ENV JAVA_HOME=/usr/lib/jvm/temurin-21-jdk
+ENV MAVEN_VERSION=3.9.9
+ENV PATH=$JAVA_HOME/bin:$PATH
+
+# Install JDK 21 (Eclipse Temurin)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    temurin-21-jdk \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Maven
+RUN curl -fsSL https://dlcdn.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz | tar -C /opt -xzf - \
+    && ln -s /opt/apache-maven-${MAVEN_VERSION}/bin/mvn /usr/local/bin/mvn
