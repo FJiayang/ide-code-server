@@ -68,7 +68,11 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH=/root/.local/bin:/home/coder/.local/bin:$PATH
 
 # Install Miniconda
-RUN curl -fsSL https://mirrors.tuna.tsinghua.edu.cn/anaconda/miniconda/Miniconda3-latest-Linux-x86_64.sh -o /tmp/miniconda.sh \
+RUN ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "amd64" ]; then CONDA_ARCH="x86_64"; \
+    elif [ "$ARCH" = "arm64" ]; then CONDA_ARCH="aarch64"; \
+    else CONDA_ARCH="$ARCH"; fi && \
+    curl -fsSL https://mirrors.tuna.tsinghua.edu.cn/anaconda/miniconda/Miniconda3-latest-Linux-${CONDA_ARCH}.sh -o /tmp/miniconda.sh \
     && bash /tmp/miniconda.sh -b -p /opt/conda \
     && rm /tmp/miniconda.sh
 ENV PATH=/opt/conda/bin:$PATH
