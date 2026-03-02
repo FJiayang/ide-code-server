@@ -33,3 +33,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends sudo \
     && chmod 440 /etc/sudoers.d/coder-nopasswd \
     && visudo -c -f /etc/sudoers.d/coder-nopasswd \
     && rm -rf /var/lib/apt/lists/*
+
+# Layer 3: Go (latest) with China mirror and tools
+ENV GO_VERSION=1.24.0
+ENV GOPROXY=https://goproxy.cn,direct
+ENV PATH=/usr/local/go/bin:/home/coder/go/bin:$PATH
+
+RUN ARCH=$(dpkg --print-architecture) \
+    && curl -fsSL https://go.dev/dl/go${GO_VERSION}.linux-${ARCH}.tar.gz | tar -C /usr/local -xzf - \
+    && go version
+
+# Install Go tools
+RUN go install golang.org/x/tools/gopls@latest \
+    && go install github.com/go-delve/delve/cmd/dlv@latest \
+    && go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest \
+    && go install golang.org/x/tools/cmd/goimports@latest
