@@ -76,3 +76,17 @@ RUN ARCH=$(dpkg --print-architecture) && \
     && bash /tmp/miniconda.sh -b -p /opt/conda \
     && rm /tmp/miniconda.sh
 ENV PATH=/opt/conda/bin:$PATH
+
+# Layer 5: Node.js (latest LTS) with China mirror
+ENV NODE_VERSION=22
+
+# Install Node.js from NodeSource
+RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Configure npm mirror and install pnpm, yarn
+RUN npm config set registry https://registry.npmmirror.com --global \
+    && npm install -g pnpm yarn \
+    && pnpm config set registry https://registry.npmmirror.com \
+    && yarn config set registry https://registry.npmmirror.com
