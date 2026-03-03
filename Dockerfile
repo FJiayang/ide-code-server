@@ -104,3 +104,35 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Maven
 RUN curl -fsSL https://dlcdn.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz | tar -C /opt -xzf - \
     && ln -s /opt/apache-maven-${MAVEN_VERSION}/bin/mvn /usr/local/bin/mvn
+
+# Layer 7: Ruby (rbenv) + Rails with Ruby China mirror
+ENV RBENV_ROOT=/home/coder/.rbenv
+ENV PATH=$RBENV_ROOT/bin:$RBENV_ROOT/shims:$PATH
+
+# Install Ruby dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    autoconf \
+    bison \
+    build-essential \
+    libssl-dev \
+    libyaml-dev \
+    libreadline6-dev \
+    zlib1g-dev \
+    libncurses5-dev \
+    libffi-dev \
+    libgdbm6 \
+    libgdbm-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install rbenv and ruby-build (as root, will be chown'd later)
+RUN git clone https://github.com/rbenv/rbenv.git /home/coder/.rbenv \
+    && git clone https://github.com/rbenv/ruby-build.git /home/coder/.rbenv/plugins/ruby-build
+
+# Install latest stable Ruby and Rails
+RUN /home/coder/.rbenv/plugins/ruby-build/install.sh \
+    && RBENV_ROOT=/home/coder/.rbenv /home/coder/.rbenv/bin/rbenv install 3.4.1 \
+    && RBENV_ROOT=/home/coder/.rbenv /home/coder/.rbenv/bin/rbenv global 3.4.1 \
+    && RBENV_ROOT=/home/coder/.rbenv /home/coder/.rbenv/shims/gem install bundler rails --no-document
+
+# Configure gem mirror
+RUN echo "---\n:sources:\n  - https://gems.ruby-china.com/" > /home/coder/.gemrc
