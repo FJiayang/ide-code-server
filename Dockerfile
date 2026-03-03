@@ -91,7 +91,7 @@ RUN npm config set registry https://registry.npmmirror.com --global \
 
 # Layer 6: JDK 21 (Temurin) + Maven 3.9.x with Aliyun mirror
 ENV JAVA_HOME=/opt/temurin-21-jdk
-ENV MAVEN_VERSION=3.9.9
+ENV MAVEN_VERSION=3.9.11
 ENV PATH=$JAVA_HOME/bin:$PATH
 
 # Install JDK 21 (Eclipse Temurin) - download directly to avoid repo setup
