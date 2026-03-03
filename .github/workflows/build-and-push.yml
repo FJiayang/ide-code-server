@@ -71,8 +71,7 @@ jobs:
         run: |
           mkdir -p /tmp/digests
           digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${{ env.PLATFORM_PAIR }}-${digest#sha256:}"
-          echo "digest=${digest}" >> $GITHUB_OUTPUT
+          touch "/tmp/digests/${digest#sha256:}"
 
       - name: Upload digest
         uses: actions/upload-artifact@v4
@@ -131,8 +130,8 @@ jobs:
         working-directory: /tmp/digests
         run: |
           # Build the list of digests
-          digests=$(find . -type f -name "*-*" | while read f; do
-            digest=$(basename "$f" | sed 's/^[^-]*-//')
+          digests=$(find . -type f | while read f; do
+            digest=$(basename "$f")
             echo "${{ env.IMAGE_NAME }}@sha256:${digest}"
           done)
 
