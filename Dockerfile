@@ -103,7 +103,7 @@ RUN ARCH=$(dpkg --print-architecture) && \
     mv /opt/jdk-21.0.6+7 /opt/temurin-21-jdk
 
 # Install Maven
-RUN curl -fsSL https://dlcdn.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz | tar -C /opt -xzf - \
+RUN curl -fsSL "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" | tar -C /opt -xzf - \
     && ln -s /opt/apache-maven-${MAVEN_VERSION}/bin/mvn /usr/local/bin/mvn
 
 # Layer 7: Ruby (rbenv) + Rails with Ruby China mirror
