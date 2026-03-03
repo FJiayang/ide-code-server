@@ -136,3 +136,43 @@ RUN /home/coder/.rbenv/plugins/ruby-build/install.sh \
 
 # Configure gem mirror
 RUN echo "---\n:sources:\n  - https://gems.ruby-china.com/" > /home/coder/.gemrc
+
+# Layer 8: Directory structure and config files
+RUN mkdir -p /home/coder/project \
+    && mkdir -p /home/coder/.local/share/code-server \
+    && mkdir -p /home/coder/.m2 \
+    && mkdir -p /home/coder/.config/pip
+
+# Maven settings.xml with Aliyun mirror
+RUN echo '<?xml version="1.0" encoding="UTF-8"?>\n\
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"\n\
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n\
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">\n\
+  <mirrors>\n\
+    <mirror>\n\
+      <id>aliyun</id>\n\
+      <mirrorOf>central</mirrorOf>\n\
+      <name>Aliyun Maven Mirror</name>\n\
+      <url>https://maven.aliyun.com/repository/public</url>\n\
+    </mirror>\n\
+  </mirrors>\n\
+</settings>' > /home/coder/.m2/settings.xml
+
+# pip config with Tsinghua mirror
+RUN echo '[global]\nindex-url = https://pypi.tuna.tsinghua.edu.cn/simple' > /home/coder/.config/pip/pip.conf
+
+# conda config with Tsinghua mirror
+RUN /opt/conda/bin/conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/free/ \
+    && /opt/conda/bin/conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main/ \
+    && /opt/conda/bin/conda config --set show_channel_urls yes \
+    && cp /root/.condarc /home/coder/.condarc 2>/dev/null || true
+
+# npm config (already configured in Layer 5)
+RUN mkdir -p /home/coder/.npm
+
+# Set ownership for coder user
+RUN chown -R coder:coder /home/coder \
+    && chown -R coder:coder /opt/conda
+
+USER coder
+WORKDIR /home/coder/project
