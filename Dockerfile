@@ -53,17 +53,17 @@ RUN go install golang.org/x/tools/gopls@latest \
 # Layer 4: Python + uv + conda with China mirrors
 ENV UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 
-# Install Miniconda first (provides Python 3.13 via conda)
+# Install Miniforge (conda-forge based, no Anaconda ToS required)
 RUN ARCH=$(dpkg --print-architecture) && \
     if [ "$ARCH" = "amd64" ]; then CONDA_ARCH="x86_64"; \
     elif [ "$ARCH" = "arm64" ]; then CONDA_ARCH="aarch64"; \
     else CONDA_ARCH="$ARCH"; fi && \
-    curl -fsSL https://mirrors.tuna.tsinghua.edu.cn/anaconda/miniconda/Miniconda3-latest-Linux-${CONDA_ARCH}.sh -o /tmp/miniconda.sh \
-    && bash /tmp/miniconda.sh -b -p /opt/conda \
-    && rm /tmp/miniconda.sh
+    curl -fsSL https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-${CONDA_ARCH}.sh -o /tmp/miniforge.sh \
+    && bash /tmp/miniforge.sh -b -p /opt/conda \
+    && rm /tmp/miniforge.sh
 ENV PATH=/opt/conda/bin:$PATH
 
-# Install Python 3.13 via conda and create symlinks
+# Install Python 3.13 via conda-forge and create symlinks
 RUN conda install -y python=3.13 \
     && conda clean -afy \
     && ln -sf /opt/conda/bin/python /usr/bin/python3 \
@@ -159,11 +159,8 @@ RUN echo '<?xml version="1.0" encoding="UTF-8"?>\n\
 # pip config with Tsinghua mirror
 RUN echo '[global]\nindex-url = https://pypi.tuna.tsinghua.edu.cn/simple' > /home/coder/.config/pip/pip.conf
 
-# conda config with Tsinghua mirror
-RUN /opt/conda/bin/conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/free/ \
-    && /opt/conda/bin/conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main/ \
-    && /opt/conda/bin/conda config --set show_channel_urls yes \
-    && cp /root/.condarc /home/coder/.condarc 2>/dev/null || true
+# conda config - Miniforge uses conda-forge by default (no Anaconda ToS)
+RUN /opt/conda/bin/conda config --set show_channel_urls yes
 
 # npm config (already configured in Layer 5)
 RUN mkdir -p /home/coder/.npm
