@@ -137,11 +137,12 @@ jobs:
           done)
 
           # Create and push manifest with all tags
-          for tag in ${{ steps.meta.outputs.tags }}; do
+          tags="${{ steps.meta.outputs.tags }}"
+          echo "$tags" | while read -r tag; do
             docker buildx imagetools create -t "$tag" $digests
           done
 
       - name: Inspect image
         run: |
-          TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1 | cut -d':' -f2)
-          docker buildx imagetools inspect ${{ env.IMAGE_NAME }}:${TAG}
+          TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1 | tr -d '\n')
+          docker buildx imagetools inspect "$TAG"
