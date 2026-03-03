@@ -50,24 +50,10 @@ RUN go install golang.org/x/tools/gopls@latest \
     && go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest \
     && go install golang.org/x/tools/cmd/goimports@latest
 
-# Layer 4: Python 3.13 + uv + conda with China mirrors
+# Layer 4: Python + uv + conda with China mirrors
 ENV UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 
-# Install Python 3.13
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.13 \
-    python3.13-venv \
-    python3.13-dev \
-    python3-pip \
-    && rm -rf /var/lib/apt/lists/* \
-    && ln -sf /usr/bin/python3.13 /usr/bin/python3 \
-    && ln -sf /usr/bin/python3 /usr/bin/python
-
-# Install uv
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH=/root/.local/bin:/home/coder/.local/bin:$PATH
-
-# Install Miniconda
+# Install Miniconda first (provides Python 3.13 via conda)
 RUN ARCH=$(dpkg --print-architecture) && \
     if [ "$ARCH" = "amd64" ]; then CONDA_ARCH="x86_64"; \
     elif [ "$ARCH" = "arm64" ]; then CONDA_ARCH="aarch64"; \
@@ -76,6 +62,18 @@ RUN ARCH=$(dpkg --print-architecture) && \
     && bash /tmp/miniconda.sh -b -p /opt/conda \
     && rm /tmp/miniconda.sh
 ENV PATH=/opt/conda/bin:$PATH
+
+# Install Python 3.13 via conda and create symlinks
+RUN conda install -y python=3.13 \
+    && conda clean -afy \
+    && ln -sf /opt/conda/bin/python /usr/bin/python3 \
+    && ln -sf /opt/conda/bin/python /usr/bin/python \
+    && ln -sf /opt/conda/bin/pip /usr/bin/pip3 \
+    && ln -sf /opt/conda/bin/pip /usr/bin/pip
+
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH=/root/.local/bin:/home/coder/.local/bin:$PATH
 
 # Layer 5: Node.js (latest LTS) with China mirror
 ENV NODE_VERSION=22
