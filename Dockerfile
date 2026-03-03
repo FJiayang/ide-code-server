@@ -90,14 +90,17 @@ RUN npm config set registry https://registry.npmmirror.com --global \
     && yarn config set registry https://registry.npmmirror.com
 
 # Layer 6: JDK 21 (Temurin) + Maven 3.9.x with Aliyun mirror
-ENV JAVA_HOME=/usr/lib/jvm/temurin-21-jdk
+ENV JAVA_HOME=/opt/temurin-21-jdk
 ENV MAVEN_VERSION=3.9.9
 ENV PATH=$JAVA_HOME/bin:$PATH
 
-# Install JDK 21 (Eclipse Temurin)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    temurin-21-jdk \
-    && rm -rf /var/lib/apt/lists/*
+# Install JDK 21 (Eclipse Temurin) - download directly to avoid repo setup
+RUN ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "amd64" ]; then JDK_ARCH="x64"; \
+    elif [ "$ARCH" = "arm64" ]; then JDK_ARCH="aarch64"; \
+    else JDK_ARCH="$ARCH"; fi && \
+    curl -fsSL "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.6%2B7/OpenJDK21U-jdk_${JDK_ARCH}_linux_hotspot_21.0.6_7.tar.gz" | tar -C /opt -xzf - && \
+    mv /opt/jdk-21.0.6+7 /opt/temurin-21-jdk
 
 # Install Maven
 RUN curl -fsSL https://dlcdn.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz | tar -C /opt -xzf - \
