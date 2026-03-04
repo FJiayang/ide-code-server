@@ -182,8 +182,13 @@ RUN /opt/conda/bin/conda config --set show_channel_urls yes
 # npm config (already configured in Layer 5)
 RUN mkdir -p /home/coder/.npm
 
-# Add rbenv initialization to .bashrc
-RUN echo 'eval "$(/home/coder/.rbenv/bin/rbenv init - bash)"' >> /home/coder/.bashrc
+# Add PATH restoration and rbenv initialization to .bashrc
+# VS Code terminal is non-login shell, only .bashrc is read
+RUN echo '# Restore Docker ENV PATH (VS Code terminal resets PATH)\n\
+export PATH=/home/coder/.rbenv/bin:/home/coder/.rbenv/shims:/opt/temurin-21-jdk/bin:/opt/conda/bin:/usr/local/go/bin:/home/coder/go/bin:$PATH\n\
+\n\
+# Initialize rbenv\n\
+eval "$(/home/coder/.rbenv/bin/rbenv init - bash)"' > /home/coder/.bashrc
 
 # Set ownership for coder user
 RUN chown -R coder:coder /home/coder \
