@@ -7,7 +7,7 @@ A comprehensive development environment Docker image based on code-server, pre-c
 - **Base**: codercom/code-server:latest
 - **User**: `coder` with passwordless sudo (su blocked)
 - **Languages**: Go, Python 3.13, Node.js, JDK 21, Ruby/Rails
-- **Tools**: git, curl, wget, vim, dnsutils (nslookup), yq, kubectl, gopls, uv, conda, pnpm, yarn, Maven
+- **Tools**: git, curl, wget, vim, dnsutils (nslookup), yq, kubectl, gopls, uv, conda, pnpm, yarn, Maven, iflow-cli
 
 ## Quick Start
 
@@ -140,7 +140,7 @@ services:
 | Python | 3.13 | uv, conda | pypi.tuna.tsinghua.edu.cn |
 | Node.js | 22 LTS | npm, pnpm, yarn | npmmirror |
 | JDK | 21 | Maven 3.9.11 | Aliyun |
-| Ruby | 3.4.1 | Rails, Bundler | Ruby China |
+| Ruby | 3.4.4 | Rails, Bundler | Ruby China |
 
 ## Build
 

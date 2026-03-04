@@ -88,9 +88,9 @@ RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure npm mirror and install pnpm, yarn
+# Configure npm mirror and install pnpm, yarn, iflow-cli
 RUN npm config set registry https://registry.npmmirror.com --global \
-    && npm install -g pnpm yarn \
+    && npm install -g pnpm yarn @iflow-ai/iflow-cli@latest \
     && pnpm config set registry https://registry.npmmirror.com \
     && yarn config set registry https://registry.npmmirror.com
 
@@ -142,8 +142,8 @@ RUN git clone https://github.com/rbenv/rbenv.git /opt/rbenv \
 
 # Install latest stable Ruby and Rails
 RUN /opt/rbenv/plugins/ruby-build/install.sh \
-    && rbenv install 3.4.1 \
-    && rbenv global 3.4.1 \
+    && rbenv install 3.4.4 \
+    && rbenv global 3.4.4 \
     && rbenv rehash \
     && gem install bundler rails --no-document \
     && rbenv rehash
