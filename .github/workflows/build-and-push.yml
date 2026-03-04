@@ -150,6 +150,7 @@ jobs:
     name: Test Image
     runs-on: ${{ matrix.runs-on }}
     needs: merge
+    timeout-minutes: 15
     permissions:
       contents: read
       packages: read
@@ -180,10 +181,14 @@ jobs:
       - name: Pull image
         run: docker pull ${{ env.IMAGE_NAME }}:${{ env.DATE_TAG }}
 
+      - name: Start test container
+        run: docker run -d --name test-container ${{ env.IMAGE_NAME }}:${{ env.DATE_TAG }} sleep 600
+
       - name: Test default user is coder
+        timeout-minutes: 1
         run: |
           echo "Testing default user is 'coder'..."
-          USER=$(docker run --rm ${{ env.IMAGE_NAME }}:${{ env.DATE_TAG }} whoami)
+          USER=$(docker exec test-container whoami)
           if [ "$USER" != "coder" ]; then
             echo "::error::Default user is '$USER', expected 'coder'"
             exit 1
@@ -191,48 +196,61 @@ jobs:
           echo "✓ Default user is 'coder'"
 
       - name: Test installed tools accessibility
+        timeout-minutes: 5
         run: |
           echo "Testing installed tools accessibility for coder user..."
           
-          # Define tools to test with their version commands
-          declare -A TOOLS=(
-            ["go"]="go version"
-            ["gopls"]="gopls version"
-            ["dlv"]="dlv version"
-            ["golangci-lint"]="golangci-lint --version"
-            ["python3"]="python3 --version"
-            ["pip"]="pip --version"
-            ["uv"]="uv --version"
-            ["conda"]="conda --version"
-            ["node"]="node --version"
-            ["npm"]="npm --version"
-            ["pnpm"]="pnpm --version"
-            ["yarn"]="yarn --version"
-            ["java"]="java -version"
-            ["mvn"]="mvn --version"
-            ["ruby"]="ruby --version"
-            ["gem"]="gem --version"
-            ["rails"]="rails --version"
-            ["git"]="git --version"
-            ["curl"]="curl --version"
-            ["wget"]="wget --version"
-            ["vim"]="vim --version | head -1"
-            ["kubectl"]="kubectl version --client"
-            ["yq"]="yq --version"
-          )
+          # Test function with timeout
+          test_tool() {
+            local tool=$1
+            local cmd=$2
+            local timeout_secs=10
+            
+            if timeout $timeout_secs docker exec test-container bash -c "$cmd" > /dev/null 2>&1; then
+              echo "  ✓ $tool is accessible"
+              return 0
+            else
+              echo "  ✗ $tool is NOT accessible"
+              return 1
+            fi
+          }
           
           FAILED_TOOLS=""
           
-          for tool in "${!TOOLS[@]}"; do
-            cmd="${TOOLS[$tool]}"
-            echo "Testing $tool..."
-            if docker run --rm ${{ env.IMAGE_NAME }}:${{ env.DATE_TAG }} bash -c "$cmd" > /dev/null 2>&1; then
-              echo "  ✓ $tool is accessible"
-            else
-              echo "  ✗ $tool is NOT accessible"
-              FAILED_TOOLS="$FAILED_TOOLS $tool"
-            fi
-          done
+          # Go tools
+          test_tool "go" "go version" || FAILED_TOOLS="$FAILED_TOOLS go"
+          test_tool "gopls" "gopls version" || FAILED_TOOLS="$FAILED_TOOLS gopls"
+          test_tool "dlv" "dlv version" || FAILED_TOOLS="$FAILED_TOOLS dlv"
+          test_tool "golangci-lint" "golangci-lint --version" || FAILED_TOOLS="$FAILED_TOOLS golangci-lint"
+          
+          # Python tools
+          test_tool "python3" "python3 --version" || FAILED_TOOLS="$FAILED_TOOLS python3"
+          test_tool "pip" "pip --version" || FAILED_TOOLS="$FAILED_TOOLS pip"
+          test_tool "uv" "uv --version" || FAILED_TOOLS="$FAILED_TOOLS uv"
+          test_tool "conda" "conda --version" || FAILED_TOOLS="$FAILED_TOOLS conda"
+          
+          # Node.js tools
+          test_tool "node" "node --version" || FAILED_TOOLS="$FAILED_TOOLS node"
+          test_tool "npm" "npm --version" || FAILED_TOOLS="$FAILED_TOOLS npm"
+          test_tool "pnpm" "pnpm --version" || FAILED_TOOLS="$FAILED_TOOLS pnpm"
+          test_tool "yarn" "yarn --version" || FAILED_TOOLS="$FAILED_TOOLS yarn"
+          
+          # Java tools
+          test_tool "java" "java -version" || FAILED_TOOLS="$FAILED_TOOLS java"
+          test_tool "mvn" "mvn --version" || FAILED_TOOLS="$FAILED_TOOLS mvn"
+          
+          # Ruby tools
+          test_tool "ruby" "ruby --version" || FAILED_TOOLS="$FAILED_TOOLS ruby"
+          test_tool "gem" "gem --version" || FAILED_TOOLS="$FAILED_TOOLS gem"
+          test_tool "rails" "rails --version" || FAILED_TOOLS="$FAILED_TOOLS rails"
+          
+          # System tools
+          test_tool "git" "git --version" || FAILED_TOOLS="$FAILED_TOOLS git"
+          test_tool "curl" "curl --version" || FAILED_TOOLS="$FAILED_TOOLS curl"
+          test_tool "wget" "wget --version" || FAILED_TOOLS="$FAILED_TOOLS wget"
+          test_tool "vim" "vim --version | head -1" || FAILED_TOOLS="$FAILED_TOOLS vim"
+          test_tool "kubectl" "kubectl version --client --output=json" || FAILED_TOOLS="$FAILED_TOOLS kubectl"
+          test_tool "yq" "yq --version" || FAILED_TOOLS="$FAILED_TOOLS yq"
           
           if [ -n "$FAILED_TOOLS" ]; then
             echo "::error::The following tools are not accessible:$FAILED_TOOLS"
@@ -242,30 +260,37 @@ jobs:
           echo "✓ All tools are accessible for coder user"
 
       - name: Test sudo without password
+        timeout-minutes: 1
         run: |
           echo "Testing sudo works without password..."
-          docker run --rm ${{ env.IMAGE_NAME }}:${{ env.DATE_TAG }} bash -c "sudo whoami" | grep -q "root" && echo "✓ sudo works without password" || { echo "::error::sudo requires password"; exit 1; }
+          docker exec test-container bash -c "sudo whoami" | grep -q "root" && echo "✓ sudo works without password" || { echo "::error::sudo requires password"; exit 1; }
 
       - name: Test su command is blocked
+        timeout-minutes: 1
         run: |
           echo "Testing su command is blocked..."
-          if docker run --rm ${{ env.IMAGE_NAME }}:${{ env.DATE_TAG }} bash -c "sudo su - root" 2>&1 | grep -q "sudo: su: command not found\|Sorry, user coder is not allowed to execute"; then
+          if docker exec test-container bash -c "sudo su - root" 2>&1 | grep -q "sudo: su: command not found\|Sorry, user coder is not allowed to execute"; then
             echo "✓ su command is properly blocked"
           else
             echo "::warning::su command might not be properly blocked"
           fi
 
       - name: Test mirror configurations
+        timeout-minutes: 2
         run: |
           echo "Testing mirror configurations..."
           
           # Test Go proxy
-          docker run --rm ${{ env.IMAGE_NAME }}:${{ env.DATE_TAG }} bash -c 'echo $GOPROXY | grep -q "goproxy.cn"' && echo "  ✓ Go proxy configured" || echo "  ⚠ Go proxy not using goproxy.cn"
+          docker exec test-container bash -c 'echo $GOPROXY | grep -q "goproxy.cn"' && echo "  ✓ Go proxy configured" || echo "  ⚠ Go proxy not using goproxy.cn"
           
           # Test npm registry
-          docker run --rm ${{ env.IMAGE_NAME }}:${{ env.DATE_TAG }} bash -c 'npm config get registry | grep -q "npmmirror"' && echo "  ✓ npm registry configured" || echo "  ⚠ npm registry not using npmmirror"
+          docker exec test-container bash -c 'npm config get registry | grep -q "npmmirror"' && echo "  ✓ npm registry configured" || echo "  ⚠ npm registry not using npmmirror"
           
           # Test gem sources
-          docker run --rm ${{ env.IMAGE_NAME }}:${{ env.DATE_TAG }} bash -c 'gem sources | grep -q "ruby-china"' && echo "  ✓ gem sources configured" || echo "  ⚠ gem sources not using ruby-china"
+          docker exec test-container bash -c 'gem sources | grep -q "ruby-china"' && echo "  ✓ gem sources configured" || echo "  ⚠ gem sources not using ruby-china"
           
           echo "✓ Mirror configurations verified"
+
+      - name: Cleanup test container
+        if: always()
+        run: docker rm -f test-container 2>/dev/null || true
