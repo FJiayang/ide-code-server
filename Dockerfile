@@ -228,7 +228,8 @@ RUN /opt/conda/bin/conda config --set show_channel_urls yes
 # Set ownership for coder user
 RUN chown -R coder:coder /home/coder \
     && chown -R coder:coder /opt/conda \
-    && chown -R coder:coder /opt/go-tools
+    && chown -R coder:coder /opt/go-tools \
+    && chown -R coder:coder /opt/rbenv/versions
 
 # Create entrypoint script that initializes home directory on container start
 # This ensures configs are properly set when /home/coder is mounted externally
