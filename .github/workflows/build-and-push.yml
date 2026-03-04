@@ -195,18 +195,21 @@ jobs:
           fi
           echo "✓ Default user is 'coder'"
 
-      - name: Test installed tools accessibility
+      - name: Test installed tools accessibility (VS Code terminal simulation)
         timeout-minutes: 5
         run: |
           echo "Testing installed tools accessibility for coder user..."
+          echo "Using interactive shell (bash -i) to simulate VS Code terminal behavior"
           
           # Test function with timeout
+          # Uses 'bash -i -c' to simulate VS Code terminal (interactive non-login shell)
+          # This ensures .bashrc is loaded, matching real VS Code terminal environment
           test_tool() {
             local tool=$1
             local cmd=$2
             local timeout_secs=10
             
-            if timeout $timeout_secs docker exec test-container bash -c "$cmd" > /dev/null 2>&1; then
+            if timeout $timeout_secs docker exec test-container bash -i -c "$cmd" > /dev/null 2>&1; then
               echo "  ✓ $tool is accessible"
               return 0
             else
@@ -257,7 +260,7 @@ jobs:
             exit 1
           fi
           
-          echo "✓ All tools are accessible for coder user"
+          echo "✓ All tools are accessible for coder user (VS Code terminal simulation)"
 
       - name: Test sudo without password
         timeout-minutes: 1
@@ -279,17 +282,18 @@ jobs:
         timeout-minutes: 2
         run: |
           echo "Testing mirror configurations..."
+          echo "Using interactive shell (bash -i) to simulate VS Code terminal behavior"
           
           # Test Go proxy
-          docker exec test-container bash -c 'echo $GOPROXY | grep -q "goproxy.cn"' && echo "  ✓ Go proxy configured" || echo "  ⚠ Go proxy not using goproxy.cn"
+          docker exec test-container bash -i -c 'echo $GOPROXY | grep -q "goproxy.cn"' && echo "  ✓ Go proxy configured" || echo "  ⚠ Go proxy not using goproxy.cn"
           
           # Test npm registry
-          docker exec test-container bash -c 'npm config get registry | grep -q "npmmirror"' && echo "  ✓ npm registry configured" || echo "  ⚠ npm registry not using npmmirror"
+          docker exec test-container bash -i -c 'npm config get registry | grep -q "npmmirror"' && echo "  ✓ npm registry configured" || echo "  ⚠ npm registry not using npmmirror"
           
           # Test gem sources
-          docker exec test-container bash -c 'gem sources | grep -q "ruby-china"' && echo "  ✓ gem sources configured" || echo "  ⚠ gem sources not using ruby-china"
+          docker exec test-container bash -i -c 'gem sources | grep -q "ruby-china"' && echo "  ✓ gem sources configured" || echo "  ⚠ gem sources not using ruby-china"
           
-          echo "✓ Mirror configurations verified"
+          echo "✓ Mirror configurations verified (VS Code terminal simulation)"
 
       - name: Cleanup test container
         if: always()
