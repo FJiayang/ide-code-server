@@ -52,6 +52,10 @@ RUN go install golang.org/x/tools/gopls@latest \
     && go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest \
     && go install golang.org/x/tools/cmd/goimports@latest
 
+# Create symlinks for go commands (ensures availability even when PATH is reset)
+RUN ln -s /usr/local/go/bin/go /usr/local/bin/go \
+    && ln -s /usr/local/go/bin/gofmt /usr/local/bin/gofmt
+
 # Layer 4: Python + uv + conda with China mirrors
 ENV UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 
@@ -107,8 +111,14 @@ RUN ARCH=$(dpkg --print-architecture) && \
 RUN curl -fsSL "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" | tar -C /opt -xzf - \
     && ln -s /opt/apache-maven-${MAVEN_VERSION}/bin/mvn /usr/local/bin/mvn
 
+# Create symlinks for java commands (ensures availability even when PATH is reset)
+RUN ln -s /opt/temurin-21-jdk/bin/java /usr/local/bin/java \
+    && ln -s /opt/temurin-21-jdk/bin/javac /usr/local/bin/javac \
+    && ln -s /opt/temurin-21-jdk/bin/jar /usr/local/bin/jar
+
 # Layer 7: Ruby (rbenv) + Rails with Ruby China mirror
-ENV RBENV_ROOT=/home/coder/.rbenv
+# Install rbenv to /opt/rbenv to avoid being overwritten by volume mounts
+ENV RBENV_ROOT=/opt/rbenv
 ENV PATH=$RBENV_ROOT/bin:$RBENV_ROOT/shims:$PATH
 
 # Install Ruby dependencies
@@ -126,23 +136,30 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgdbm-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install rbenv and ruby-build (as root, will be chown'd later)
-RUN git clone https://github.com/rbenv/rbenv.git /home/coder/.rbenv \
-    && git clone https://github.com/rbenv/ruby-build.git /home/coder/.rbenv/plugins/ruby-build
+# Install rbenv and ruby-build to /opt/rbenv (system path, not affected by volume mounts)
+RUN git clone https://github.com/rbenv/rbenv.git /opt/rbenv \
+    && git clone https://github.com/rbenv/ruby-build.git /opt/rbenv/plugins/ruby-build
 
 # Install latest stable Ruby and Rails
-# Note: rbenv rehash generates shims in ~/.rbenv/shims directory
-RUN /home/coder/.rbenv/plugins/ruby-build/install.sh \
-    && RBENV_ROOT=/home/coder/.rbenv /home/coder/.rbenv/bin/rbenv install 3.4.1 \
-    && RBENV_ROOT=/home/coder/.rbenv /home/coder/.rbenv/bin/rbenv global 3.4.1 \
-    && RBENV_ROOT=/home/coder/.rbenv /home/coder/.rbenv/bin/rbenv rehash \
-    && RBENV_ROOT=/home/coder/.rbenv /home/coder/.rbenv/shims/gem install bundler rails --no-document \
-    && RBENV_ROOT=/home/coder/.rbenv /home/coder/.rbenv/bin/rbenv rehash
+RUN /opt/rbenv/plugins/ruby-build/install.sh \
+    && rbenv install 3.4.1 \
+    && rbenv global 3.4.1 \
+    && rbenv rehash \
+    && gem install bundler rails --no-document \
+    && rbenv rehash
 
 # Configure gem mirror
 RUN echo "---\n:sources:\n  - https://gems.ruby-china.com/" > /home/coder/.gemrc
 
 # Layer 8: Directory structure and config files
+# Create system-wide PATH config (not affected by volume mounts on /home/coder)
+# This ensures tools are accessible in all shell types (login/non-login, interactive/non-interactive)
+RUN echo '#!/bin/sh\n\
+# Development tools PATH configuration\n\
+# Note: Symlinks in /usr/local/bin provide fallback, this is additional coverage\n\
+export PATH=/opt/rbenv/bin:/opt/rbenv/shims:/usr/local/go/bin:/home/coder/go/bin:/opt/temurin-21-jdk/bin:/opt/conda/bin:$PATH' > /etc/profile.d/dev-tools.sh \
+    && chmod +x /etc/profile.d/dev-tools.sh
+
 # Create directories for external mounting support
 RUN mkdir -p /home/coder/project \
     && mkdir -p /home/coder/.local/share/code-server \
@@ -184,13 +201,16 @@ RUN mkdir -p /home/coder/.npm
 
 # Add PATH restoration and rbenv initialization to .bashrc
 # VS Code terminal is non-login shell, only .bashrc is read
-RUN echo '# Restore Docker ENV PATH (VS Code terminal resets PATH)\n\
-export PATH=/home/coder/.rbenv/bin:/home/coder/.rbenv/shims:/opt/temurin-21-jdk/bin:/opt/conda/bin:/usr/local/go/bin:/home/coder/go/bin:$PATH\n\
+# Use >> to append instead of > to avoid overwriting existing .bashrc
+RUN echo '\n\
+# Restore Docker ENV PATH (VS Code terminal resets PATH)\n\
+export PATH=/opt/rbenv/bin:/opt/rbenv/shims:/opt/temurin-21-jdk/bin:/opt/conda/bin:/usr/local/go/bin:/home/coder/go/bin:$PATH\n\
 \n\
 # Initialize rbenv\n\
-eval "$(/home/coder/.rbenv/bin/rbenv init - bash)"' > /home/coder/.bashrc
+eval "$(/opt/rbenv/bin/rbenv init - bash)"' >> /home/coder/.bashrc
 
 # Set ownership for coder user
+# Note: /opt/rbenv is owned by root, but accessible by all users
 RUN chown -R coder:coder /home/coder \
     && chown -R coder:coder /opt/conda
 
