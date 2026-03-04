@@ -88,9 +88,9 @@ RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure npm mirror and install pnpm, yarn, iflow-cli
+# Configure npm mirror and install pnpm, yarn, iflow-cli, claude-code
 RUN npm config set registry https://registry.npmmirror.com --global \
-    && npm install -g pnpm yarn @iflow-ai/iflow-cli@latest \
+    && npm install -g pnpm yarn @iflow-ai/iflow-cli@latest @anthropic-ai/claude-code \
     && pnpm config set registry https://registry.npmmirror.com \
     && yarn config set registry https://registry.npmmirror.com
 
