@@ -132,6 +132,44 @@ services:
    - Go tools installed via `go install`
    - Maven dependencies cached locally
 
+## Mounting Entire /home/coder Directory
+
+You can mount the entire `/home/coder` directory for maximum persistence:
+
+```bash
+docker run -d \
+  --name ide-code-server \
+  -p 8080:8080 \
+  -v $(pwd)/coder-home:/home/coder \
+  -e PASSWORD=yourpassword \
+  ghcr.io/your-username/ide-code-server:latest
+```
+
+### Auto-Initialization
+
+When `/home/coder` is mounted (especially as an empty directory), the container automatically initializes:
+
+| File | Purpose |
+|------|---------|
+| `.bashrc` | PATH restoration and rbenv initialization |
+| `.gemrc` | Ruby China mirror configuration |
+| `.m2/settings.xml` | Maven Aliyun mirror configuration |
+| `.config/pip/pip.conf` | pip Tsinghua mirror configuration |
+
+Required directories are also created automatically.
+
+### System Tools (Not Affected by Mounts)
+
+The following components are installed in system directories and remain available regardless of volume mounts:
+
+| Component | Location | Tools |
+|-----------|----------|-------|
+| Go Tools | `/opt/go-tools/bin` | gopls, dlv, golangci-lint, goimports |
+| Ruby (rbenv) | `/opt/rbenv` | ruby, gem, rails, bundler |
+| Python/conda | `/opt/conda` | python, pip, conda |
+| JDK | `/opt/temurin-21-jdk` | java, javac, jar |
+| Maven | `/opt/apache-maven` | mvn |
+
 ## Installed Languages
 
 | Language | Version | Tools | Mirror |

@@ -39,18 +39,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends sudo \
 # Layer 3: Go (latest) with China mirror and tools
 ENV GO_VERSION=1.24.0
 ENV GOPROXY=https://goproxy.cn,direct
+# GOPATH for user packages (can be mounted), tools installed to /opt/go-tools
 ENV GOPATH=/home/coder/go
-ENV PATH=/usr/local/go/bin:/home/coder/go/bin:$PATH
+ENV GO_TOOLS_PATH=/opt/go-tools
+ENV PATH=/usr/local/go/bin:/opt/go-tools/bin:/home/coder/go/bin:$PATH
 
 RUN ARCH=$(dpkg --print-architecture) \
     && curl -fsSL https://go.dev/dl/go${GO_VERSION}.linux-${ARCH}.tar.gz | tar -C /usr/local -xzf - \
     && go version
 
-# Install Go tools
-RUN go install golang.org/x/tools/gopls@latest \
-    && go install github.com/go-delve/delve/cmd/dlv@latest \
-    && go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest \
-    && go install golang.org/x/tools/cmd/goimports@latest
+# Install Go tools to /opt/go-tools (not affected by volume mounts on /home/coder)
+RUN mkdir -p /opt/go-tools \
+    && GOPATH=/opt/go-tools go install golang.org/x/tools/gopls@latest \
+    && GOPATH=/opt/go-tools go install github.com/go-delve/delve/cmd/dlv@latest \
+    && GOPATH=/opt/go-tools go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest \
+    && GOPATH=/opt/go-tools go install golang.org/x/tools/cmd/goimports@latest \
+    && chown -R coder:coder /opt/go-tools
 
 # Create symlinks for go commands (ensures availability even when PATH is reset)
 RUN ln -s /usr/local/go/bin/go /usr/local/bin/go \
@@ -157,8 +161,45 @@ RUN echo "---\n:sources:\n  - https://gems.ruby-china.com/" > /home/coder/.gemrc
 RUN echo '#!/bin/sh\n\
 # Development tools PATH configuration\n\
 # Note: Symlinks in /usr/local/bin provide fallback, this is additional coverage\n\
-export PATH=/opt/rbenv/bin:/opt/rbenv/shims:/usr/local/go/bin:/home/coder/go/bin:/opt/temurin-21-jdk/bin:/opt/conda/bin:$PATH' > /etc/profile.d/dev-tools.sh \
+export PATH=/opt/go-tools/bin:/opt/rbenv/bin:/opt/rbenv/shims:/usr/local/go/bin:/home/coder/go/bin:/opt/temurin-21-jdk/bin:/opt/conda/bin:$PATH' > /etc/profile.d/dev-tools.sh \
     && chmod +x /etc/profile.d/dev-tools.sh
+
+# Create config templates directory (for volume mount compatibility)
+# When /home/coder is mounted externally, these templates will be used to initialize configs
+RUN mkdir -p /opt/dev-configs
+
+# bashrc append content template
+RUN echo '\n\
+# Restore Docker ENV PATH (VS Code terminal resets PATH)\n\
+export PATH=/opt/go-tools/bin:/opt/rbenv/bin:/opt/rbenv/shims:/opt/temurin-21-jdk/bin:/opt/conda/bin:/usr/local/go/bin:/home/coder/go/bin:$PATH\n\
+\n\
+# Initialize rbenv\n\
+eval "$(/opt/rbenv/bin/rbenv init - bash)"' > /opt/dev-configs/bashrc-append.sh
+
+# gemrc template
+RUN echo '---\n:sources:\n  - https://gems.ruby-china.com/' > /opt/dev-configs/gemrc
+
+# Maven settings.xml template
+RUN echo '<?xml version="1.0" encoding="UTF-8"?>\n\
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"\n\
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n\
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">\n\
+  <mirrors>\n\
+    <mirror>\n\
+      <id>aliyun</id>\n\
+      <mirrorOf>central</mirrorOf>\n\
+      <name>Aliyun Maven Mirror</name>\n\
+      <url>https://maven.aliyun.com/repository/public</url>\n\
+    </mirror>\n\
+  </mirrors>\n\
+</settings>' > /opt/dev-configs/m2-settings.xml
+
+# pip config template
+RUN echo '[global]\nindex-url = https://pypi.tuna.tsinghua.edu.cn/simple' > /opt/dev-configs/pip.conf
+
+# Copy initialization script
+COPY scripts/init-home.sh /opt/dev-configs/init-home.sh
+RUN chmod +x /opt/dev-configs/init-home.sh
 
 # Create directories for external mounting support
 RUN mkdir -p /home/coder/project \
@@ -175,44 +216,32 @@ RUN mkdir -p /home/coder/project \
 # These can be mounted to persist data across container restarts
 VOLUME ["/home/coder/project"]
 
-# Maven settings.xml with Aliyun mirror
-RUN echo '<?xml version="1.0" encoding="UTF-8"?>\n\
-<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"\n\
-          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n\
-          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">\n\
-  <mirrors>\n\
-    <mirror>\n\
-      <id>aliyun</id>\n\
-      <mirrorOf>central</mirrorOf>\n\
-      <name>Aliyun Maven Mirror</name>\n\
-      <url>https://maven.aliyun.com/repository/public</url>\n\
-    </mirror>\n\
-  </mirrors>\n\
-</settings>' > /home/coder/.m2/settings.xml
-
-# pip config with Tsinghua mirror
-RUN echo '[global]\nindex-url = https://pypi.tuna.tsinghua.edu.cn/simple' > /home/coder/.config/pip/pip.conf
+# Initialize config files from templates
+RUN cp /opt/dev-configs/gemrc /home/coder/.gemrc \
+    && cp /opt/dev-configs/m2-settings.xml /home/coder/.m2/settings.xml \
+    && cp /opt/dev-configs/pip.conf /home/coder/.config/pip/pip.conf \
+    && cat /opt/dev-configs/bashrc-append.sh >> /home/coder/.bashrc
 
 # conda config - Miniforge uses conda-forge by default (no Anaconda ToS)
 RUN /opt/conda/bin/conda config --set show_channel_urls yes
 
-# npm config (already configured in Layer 5)
-RUN mkdir -p /home/coder/.npm
-
-# Add PATH restoration and rbenv initialization to .bashrc
-# VS Code terminal is non-login shell, only .bashrc is read
-# Use >> to append instead of > to avoid overwriting existing .bashrc
-RUN echo '\n\
-# Restore Docker ENV PATH (VS Code terminal resets PATH)\n\
-export PATH=/opt/rbenv/bin:/opt/rbenv/shims:/opt/temurin-21-jdk/bin:/opt/conda/bin:/usr/local/go/bin:/home/coder/go/bin:$PATH\n\
-\n\
-# Initialize rbenv\n\
-eval "$(/opt/rbenv/bin/rbenv init - bash)"' >> /home/coder/.bashrc
-
 # Set ownership for coder user
-# Note: /opt/rbenv is owned by root, but accessible by all users
 RUN chown -R coder:coder /home/coder \
-    && chown -R coder:coder /opt/conda
+    && chown -R coder:coder /opt/conda \
+    && chown -R coder:coder /opt/go-tools
+
+# Create entrypoint script that initializes home directory on container start
+# This ensures configs are properly set when /home/coder is mounted externally
+RUN echo '#!/bin/bash\n\
+# Initialize home directory if mounted externally\n\
+/opt/dev-configs/init-home.sh\n\
+# Execute the original entrypoint or command\n\
+exec "$@"' > /entrypoint.sh \
+    && chmod +x /entrypoint.sh
 
 USER coder
 WORKDIR /home/coder/project
+
+# Use custom entrypoint to handle volume mount initialization
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["code-server", "--bind-addr", "0.0.0.0:8080", "."]
