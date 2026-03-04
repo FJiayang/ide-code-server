@@ -168,6 +168,9 @@ RUN /opt/conda/bin/conda config --set show_channel_urls yes
 # npm config (already configured in Layer 5)
 RUN mkdir -p /home/coder/.npm
 
+# Add rbenv initialization to .bashrc
+RUN echo 'eval "$(/home/coder/.rbenv/bin/rbenv init - bash)"' >> /home/coder/.bashrc
+
 # Set ownership for coder user
 RUN chown -R coder:coder /home/coder \
     && chown -R coder:coder /opt/conda
