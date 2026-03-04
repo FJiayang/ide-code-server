@@ -73,9 +73,8 @@ RUN conda install -y python=3.13 \
     && ln -sf /opt/conda/bin/pip /usr/bin/pip3 \
     && ln -sf /opt/conda/bin/pip /usr/bin/pip
 
-# Install uv
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH=/root/.local/bin:/home/coder/.local/bin:$PATH
+# Install uv (official recommended way: copy from pre-built image)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
 # Layer 5: Node.js (latest LTS) with China mirror
 ENV NODE_VERSION=22
@@ -144,10 +143,20 @@ RUN /home/coder/.rbenv/plugins/ruby-build/install.sh \
 RUN echo "---\n:sources:\n  - https://gems.ruby-china.com/" > /home/coder/.gemrc
 
 # Layer 8: Directory structure and config files
+# Create directories for external mounting support
 RUN mkdir -p /home/coder/project \
     && mkdir -p /home/coder/.local/share/code-server \
-    && mkdir -p /home/coder/.m2 \
-    && mkdir -p /home/coder/.config/pip
+    && mkdir -p /home/coder/.local/share/pnpm \
+    && mkdir -p /home/coder/.m2/repository \
+    && mkdir -p /home/coder/.config/pip \
+    && mkdir -p /home/coder/.npm \
+    && mkdir -p /home/coder/.cache/uv \
+    && mkdir -p /home/coder/.cache/pip \
+    && mkdir -p /home/coder/go
+
+# Declare volumes for external mounting (optional, users can override with -v)
+# These can be mounted to persist data across container restarts
+VOLUME ["/home/coder/project"]
 
 # Maven settings.xml with Aliyun mirror
 RUN echo '<?xml version="1.0" encoding="UTF-8"?>\n\
