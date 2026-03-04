@@ -132,16 +132,13 @@ RUN git clone https://github.com/rbenv/rbenv.git /home/coder/.rbenv \
     && git clone https://github.com/rbenv/ruby-build.git /home/coder/.rbenv/plugins/ruby-build
 
 # Install latest stable Ruby and Rails
+# Note: rbenv rehash generates shims in ~/.rbenv/shims directory
 RUN /home/coder/.rbenv/plugins/ruby-build/install.sh \
     && RBENV_ROOT=/home/coder/.rbenv /home/coder/.rbenv/bin/rbenv install 3.4.1 \
     && RBENV_ROOT=/home/coder/.rbenv /home/coder/.rbenv/bin/rbenv global 3.4.1 \
-    && RBENV_ROOT=/home/coder/.rbenv /home/coder/.rbenv/shims/gem install bundler rails --no-document
-
-# Create symlinks for ruby, gem, rails to system path (ensures commands work in all shells)
-RUN ln -sf /home/coder/.rbenv/shims/ruby /usr/local/bin/ruby \
-    && ln -sf /home/coder/.rbenv/shims/gem /usr/local/bin/gem \
-    && ln -sf /home/coder/.rbenv/shims/rails /usr/local/bin/rails \
-    && ln -sf /home/coder/.rbenv/shims/bundler /usr/local/bin/bundler
+    && RBENV_ROOT=/home/coder/.rbenv /home/coder/.rbenv/bin/rbenv rehash \
+    && RBENV_ROOT=/home/coder/.rbenv /home/coder/.rbenv/shims/gem install bundler rails --no-document \
+    && RBENV_ROOT=/home/coder/.rbenv /home/coder/.rbenv/bin/rbenv rehash
 
 # Configure gem mirror
 RUN echo "---\n:sources:\n  - https://gems.ruby-china.com/" > /home/coder/.gemrc

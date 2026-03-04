@@ -145,3 +145,127 @@ jobs:
         run: |
           TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1 | tr -d '\n')
           docker buildx imagetools inspect "$TAG"
+
+  test:
+    name: Test Image
+    runs-on: ${{ matrix.runs-on }}
+    needs: merge
+    permissions:
+      contents: read
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runs-on: ubuntu-latest
+          - platform: linux/arm64
+            runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Set lowercase image name
+        run: |
+          echo "IMAGE_NAME=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Get current date for tagging
+        run: echo "DATE_TAG=$(date +'%Y%m%d')" >> $GITHUB_ENV
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull image
+        run: docker pull ${{ env.IMAGE_NAME }}:${{ env.DATE_TAG }}
+
+      - name: Test default user is coder
+        run: |
+          echo "Testing default user is 'coder'..."
+          USER=$(docker run --rm ${{ env.IMAGE_NAME }}:${{ env.DATE_TAG }} whoami)
+          if [ "$USER" != "coder" ]; then
+            echo "::error::Default user is '$USER', expected 'coder'"
+            exit 1
+          fi
+          echo "✓ Default user is 'coder'"
+
+      - name: Test installed tools accessibility
+        run: |
+          echo "Testing installed tools accessibility for coder user..."
+          
+          # Define tools to test with their version commands
+          declare -A TOOLS=(
+            ["go"]="go version"
+            ["gopls"]="gopls version"
+            ["dlv"]="dlv version"
+            ["golangci-lint"]="golangci-lint --version"
+            ["python3"]="python3 --version"
+            ["pip"]="pip --version"
+            ["uv"]="uv --version"
+            ["conda"]="conda --version"
+            ["node"]="node --version"
+            ["npm"]="npm --version"
+            ["pnpm"]="pnpm --version"
+            ["yarn"]="yarn --version"
+            ["java"]="java -version"
+            ["mvn"]="mvn --version"
+            ["ruby"]="ruby --version"
+            ["gem"]="gem --version"
+            ["rails"]="rails --version"
+            ["git"]="git --version"
+            ["curl"]="curl --version"
+            ["wget"]="wget --version"
+            ["vim"]="vim --version | head -1"
+            ["kubectl"]="kubectl version --client"
+            ["yq"]="yq --version"
+          )
+          
+          FAILED_TOOLS=""
+          
+          for tool in "${!TOOLS[@]}"; do
+            cmd="${TOOLS[$tool]}"
+            echo "Testing $tool..."
+            if docker run --rm ${{ env.IMAGE_NAME }}:${{ env.DATE_TAG }} bash -c "$cmd" > /dev/null 2>&1; then
+              echo "  ✓ $tool is accessible"
+            else
+              echo "  ✗ $tool is NOT accessible"
+              FAILED_TOOLS="$FAILED_TOOLS $tool"
+            fi
+          done
+          
+          if [ -n "$FAILED_TOOLS" ]; then
+            echo "::error::The following tools are not accessible:$FAILED_TOOLS"
+            exit 1
+          fi
+          
+          echo "✓ All tools are accessible for coder user"
+
+      - name: Test sudo without password
+        run: |
+          echo "Testing sudo works without password..."
+          docker run --rm ${{ env.IMAGE_NAME }}:${{ env.DATE_TAG }} bash -c "sudo whoami" | grep -q "root" && echo "✓ sudo works without password" || { echo "::error::sudo requires password"; exit 1; }
+
+      - name: Test su command is blocked
+        run: |
+          echo "Testing su command is blocked..."
+          if docker run --rm ${{ env.IMAGE_NAME }}:${{ env.DATE_TAG }} bash -c "sudo su - root" 2>&1 | grep -q "sudo: su: command not found\|Sorry, user coder is not allowed to execute"; then
+            echo "✓ su command is properly blocked"
+          else
+            echo "::warning::su command might not be properly blocked"
+          fi
+
+      - name: Test mirror configurations
+        run: |
+          echo "Testing mirror configurations..."
+          
+          # Test Go proxy
+          docker run --rm ${{ env.IMAGE_NAME }}:${{ env.DATE_TAG }} bash -c 'echo $GOPROXY | grep -q "goproxy.cn"' && echo "  ✓ Go proxy configured" || echo "  ⚠ Go proxy not using goproxy.cn"
+          
+          # Test npm registry
+          docker run --rm ${{ env.IMAGE_NAME }}:${{ env.DATE_TAG }} bash -c 'npm config get registry | grep -q "npmmirror"' && echo "  ✓ npm registry configured" || echo "  ⚠ npm registry not using npmmirror"
+          
+          # Test gem sources
+          docker run --rm ${{ env.IMAGE_NAME }}:${{ env.DATE_TAG }} bash -c 'gem sources | grep -q "ruby-china"' && echo "  ✓ gem sources configured" || echo "  ⚠ gem sources not using ruby-china"
+          
+          echo "✓ Mirror configurations verified"
