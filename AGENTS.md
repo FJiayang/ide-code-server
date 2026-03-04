@@ -36,11 +36,12 @@ ide-code-server/
 # 构建镜像
 docker build -t ide-code-server .
 
-# 本地运行
+# 本地运行（最小配置）
 docker run -d \
   --name ide-code-server \
   -p 8080:8080 \
-  -v $(pwd)/data:/home/coder \
+  -v $(pwd)/project:/home/coder/project \
+  -v $(pwd)/code-server:/home/coder/.local/share/code-server \
   -e PASSWORD=yourpassword \
   ide-code-server:latest
 ```
@@ -97,13 +98,49 @@ Dockerfile 采用精心设计的分层结构以优化缓存效率：
 ```
 /home/coder/
 ├── project/                              # 工作区（主要挂载点）
-├── .local/share/code-server/             # VS Code 扩展目录
-├── .m2/settings.xml                      # Maven 配置
+├── .local/share/code-server/             # VS Code 扩展和用户数据
+├── .local/share/pnpm/                    # pnpm 包存储
+├── .m2/
+│   ├── settings.xml                      # Maven 配置
+│   └── repository/                       # Maven 本地仓库
+├── .npm/                                 # npm 缓存
 ├── .npmrc                                # npm 配置
 ├── .gemrc                                # gem 配置
 ├── .config/pip/pip.conf                  # pip 配置
-├── go/                                   # Go GOPATH
+├── .cache/
+│   ├── uv/                               # uv 缓存
+│   └── pip/                              # pip 缓存
+├── go/                                   # Go GOPATH（用户安装的包）
 └── .rbenv/                               # Ruby 版本管理
+```
+
+## 外部挂载支持
+
+为提升开发体验，以下目录支持外部挂载以实现数据持久化：
+
+| 容器路径 | 用途 | 挂载优势 |
+|----------|------|----------|
+| `/home/coder/project` | 工作区 | 代码持久化 |
+| `/home/coder/.local/share/code-server` | VS Code 数据 | 扩展和设置持久化 |
+| `/home/coder/.npm` | npm 缓存 | 避免重复下载 |
+| `/home/coder/.local/share/pnpm` | pnpm 存储 | 共享包存储 |
+| `/home/coder/go` | Go 包 | 持久化 go install 的包 |
+| `/home/coder/.cache/uv` | uv 缓存 | Python 包缓存 |
+| `/home/coder/.cache/pip` | pip 缓存 | pip 包缓存 |
+| `/home/coder/.m2/repository` | Maven 仓库 | Java 依赖缓存 |
+
+### 推荐挂载配置
+
+```bash
+docker run -d \
+  --name ide-code-server \
+  -p 8080:8080 \
+  -v $(pwd)/project:/home/coder/project \
+  -v $(pwd)/code-server:/home/coder/.local/share/code-server \
+  -v $(pwd)/npm:/home/coder/.npm \
+  -v $(pwd)/go:/home/coder/go \
+  -e PASSWORD=yourpassword \
+  ghcr.io/fjiayang/ide-code-server:latest
 ```
 
 ## 开发约定
