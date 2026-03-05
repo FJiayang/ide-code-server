@@ -173,6 +173,9 @@ RUN echo '\n\
 # Restore Docker ENV PATH (VS Code terminal resets PATH)\n\
 export PATH=/opt/go-tools/bin:/opt/rbenv/bin:/opt/rbenv/shims:/opt/temurin-21-jdk/bin:/opt/conda/bin:/usr/local/go/bin:/home/coder/go/bin:$PATH\n\
 \n\
+# User-installed gem executables path\n\
+export PATH=/home/coder/.local/share/gem/ruby/3.4.0/bin:$PATH\n\
+\n\
 # Initialize rbenv\n\
 eval "$(/opt/rbenv/bin/rbenv init - bash)"' > /opt/dev-configs/bashrc-append.sh
 
@@ -229,7 +232,9 @@ RUN /opt/conda/bin/conda config --set show_channel_urls yes
 RUN chown -R coder:coder /home/coder \
     && chown -R coder:coder /opt/conda \
     && chown -R coder:coder /opt/go-tools \
-    && chown -R coder:coder /opt/rbenv/versions
+    && chown -R coder:coder /opt/rbenv/versions \
+    && chown -R coder:coder /opt/rbenv/shims \
+    && chown coder:coder /opt/rbenv/version
 
 # Create entrypoint script that initializes home directory on container start
 # This ensures configs are properly set when /home/coder is mounted externally
