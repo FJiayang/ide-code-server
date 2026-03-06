@@ -94,7 +94,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
 
 # Configure npm mirror and install pnpm, yarn, iflow-cli, claude-code
 RUN npm config set registry https://registry.npmmirror.com --global \
-    && npm install -g pnpm yarn @iflow-ai/iflow-cli@latest @anthropic-ai/claude-code \
+    && npm install -g pnpm yarn @iflow-ai/iflow-cli@latest @anthropic-ai/claude-code@2.1.41 \
     && pnpm config set registry https://registry.npmmirror.com \
     && yarn config set registry https://registry.npmmirror.com
 
