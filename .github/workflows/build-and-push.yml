@@ -274,10 +274,18 @@ jobs:
         timeout-minutes: 1
         run: |
           echo "Testing su command is blocked..."
-          if docker exec test-container bash -c "sudo su - root" 2>&1 | grep -q "sudo: su: command not found\|Sorry, user coder is not allowed to execute"; then
+          SU_OUTPUT=$(docker exec test-container bash -c "sudo -n /usr/bin/su - root -c 'whoami'" 2>&1 || true)
+          echo "sudo su output: $SU_OUTPUT"
+          
+          if echo "$SU_OUTPUT" | grep -q "^root$"; then
+            echo "::error::su command escalated to root; policy is broken"
+            exit 1
+          fi
+          
+          if echo "$SU_OUTPUT" | grep -Eq "not allowed to execute|command not found|a password is required|password is required|authentication is required"; then
             echo "✓ su command is properly blocked"
           else
-            echo "::error::su command is not blocked as expected"
+            echo "::error::Unexpected sudo/su behavior: $SU_OUTPUT"
             exit 1
           fi
 

@@ -32,9 +32,11 @@ RUN mkdir -p /etc/apt/keyrings \
 
 # Layer 2: User permissions - sudo with su blocked
 RUN apt-get update && apt-get install -y --no-install-recommends sudo \
-    && echo "coder ALL=(ALL) NOPASSWD: ALL, !/usr/bin/su, !/bin/su" > /etc/sudoers.d/coder-nopasswd \
-    && chmod 440 /etc/sudoers.d/coder-nopasswd \
-    && visudo -c -f /etc/sudoers.d/coder-nopasswd \
+    && find /etc/sudoers.d -maxdepth 1 -type f -name '*coder*' -delete \
+    && echo "coder ALL=(ALL) NOPASSWD: ALL, !/usr/bin/su, !/bin/su" > /etc/sudoers.d/zz-coder-policy \
+    && chmod 440 /etc/sudoers.d/zz-coder-policy \
+    && visudo -c -f /etc/sudoers.d/zz-coder-policy \
+    && sudo -l -U coder | grep -Eq '!(/usr/bin/su|/bin/su)' \
     && rm -rf /var/lib/apt/lists/*
 
 # Layer 3: Go (pinned stable) with China mirror and tools
