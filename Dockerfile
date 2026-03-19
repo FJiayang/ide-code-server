@@ -27,7 +27,7 @@ RUN mkdir -p /etc/apt/keyrings \
     && chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg \
     && echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /' | tee /etc/apt/sources.list.d/kubernetes.list \
     && apt-get update \
-    && apt-get install -y kubectl \
+    && apt-get install -y --no-install-recommends kubectl \
     && rm -rf /var/lib/apt/lists/*
 
 # Layer 2: User permissions - sudo with su blocked
@@ -37,8 +37,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends sudo \
     && visudo -c -f /etc/sudoers.d/coder-nopasswd \
     && rm -rf /var/lib/apt/lists/*
 
-# Layer 3: Go (latest) with China mirror and tools
-ENV GO_VERSION=1.24.0
+# Layer 3: Go (pinned stable) with China mirror and tools
+ENV GO_VERSION=1.26.1
+ENV GO_SHA256_AMD64=031f088e5d955bab8657ede27ad4e3bc5b7c1ba281f05f245bcc304f327c987a
+ENV GO_SHA256_ARM64=a290581cfe4fe28ddd737dde3095f3dbeb7f2e4065cab4eae44dfc53b760c2f7
 ENV GOPROXY=https://goproxy.cn,direct
 # GOPATH for user packages (can be mounted), tools installed to /opt/go-tools
 ENV GOPATH=/home/coder/go
@@ -46,16 +48,24 @@ ENV GO_TOOLS_PATH=/opt/go-tools
 ENV PATH=/usr/local/go/bin:/opt/go-tools/bin:/home/coder/go/bin:$PATH
 
 RUN ARCH=$(dpkg --print-architecture) \
-    && curl -fsSL https://go.dev/dl/go${GO_VERSION}.linux-${ARCH}.tar.gz | tar -C /usr/local -xzf - \
+    && case "$ARCH" in \
+      amd64) GO_SHA256="$GO_SHA256_AMD64" ;; \
+      arm64) GO_SHA256="$GO_SHA256_ARM64" ;; \
+      *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
+    esac \
+    && curl -fsSL https://go.dev/dl/go${GO_VERSION}.linux-${ARCH}.tar.gz -o /tmp/go.tgz \
+    && echo "${GO_SHA256}  /tmp/go.tgz" | sha256sum -c - \
+    && rm -rf /usr/local/go \
+    && tar -C /usr/local -xzf /tmp/go.tgz \
+    && rm -f /tmp/go.tgz \
     && go version
 
 # Install Go tools to /opt/go-tools (not affected by volume mounts on /home/coder)
-RUN mkdir -p /opt/go-tools \
-    && GOPATH=/opt/go-tools go install golang.org/x/tools/gopls@latest \
-    && GOPATH=/opt/go-tools go install github.com/go-delve/delve/cmd/dlv@latest \
-    && GOPATH=/opt/go-tools go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest \
-    && GOPATH=/opt/go-tools go install golang.org/x/tools/cmd/goimports@latest \
-    && chown -R coder:coder /opt/go-tools
+RUN install -d -o coder -g coder /opt/go-tools \
+    && sudo -u coder env GOPATH=/opt/go-tools go install golang.org/x/tools/gopls@latest \
+    && sudo -u coder env GOPATH=/opt/go-tools go install github.com/go-delve/delve/cmd/dlv@latest \
+    && sudo -u coder env GOPATH=/opt/go-tools go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest \
+    && sudo -u coder env GOPATH=/opt/go-tools go install golang.org/x/tools/cmd/goimports@latest
 
 # Create symlinks for go commands (ensures availability even when PATH is reset)
 RUN ln -s /usr/local/go/bin/go /usr/local/bin/go \
@@ -65,18 +75,21 @@ RUN ln -s /usr/local/go/bin/go /usr/local/bin/go \
 ENV UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 
 # Install Miniforge (conda-forge based, no Anaconda ToS required)
-RUN ARCH=$(dpkg --print-architecture) && \
+RUN install -d -o coder -g coder /opt/conda \
+    && ARCH=$(dpkg --print-architecture) && \
     if [ "$ARCH" = "amd64" ]; then CONDA_ARCH="x86_64"; \
     elif [ "$ARCH" = "arm64" ]; then CONDA_ARCH="aarch64"; \
     else CONDA_ARCH="$ARCH"; fi && \
     curl -fsSL https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-${CONDA_ARCH}.sh -o /tmp/miniforge.sh \
-    && bash /tmp/miniforge.sh -b -p /opt/conda \
+    && chmod +x /tmp/miniforge.sh \
+    && sudo -u coder bash /tmp/miniforge.sh -b -p /opt/conda \
     && rm /tmp/miniforge.sh
 ENV PATH=/opt/conda/bin:$PATH
 
 # Install Python 3.13 via conda-forge and create symlinks
-RUN conda install -y python=3.13 \
-    && conda clean -afy \
+RUN sudo -u coder /opt/conda/bin/conda install -y python=3.13 \
+    && sudo -u coder /opt/conda/bin/conda config --set show_channel_urls yes \
+    && sudo -u coder /opt/conda/bin/conda clean -afy \
     && ln -sf /opt/conda/bin/python /usr/bin/python3 \
     && ln -sf /opt/conda/bin/python /usr/bin/python \
     && ln -sf /opt/conda/bin/pip /usr/bin/pip3 \
@@ -90,12 +103,13 @@ ENV NODE_VERSION=22
 
 # Install Node.js from NodeSource
 RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
-    && apt-get install -y nodejs \
+    && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Configure npm mirror and install pnpm, yarn, iflow-cli, claude-code
 RUN npm config set registry https://registry.npmmirror.com --global \
     && npm install -g pnpm yarn @iflow-ai/iflow-cli@latest @anthropic-ai/claude-code@latest \
+    && npm cache clean --force \
     && pnpm config set registry https://registry.npmmirror.com \
     && yarn config set registry https://registry.npmmirror.com
 
@@ -124,6 +138,8 @@ RUN ln -s /opt/temurin-21-jdk/bin/java /usr/local/bin/java \
 # Layer 7: Ruby (rbenv) + Rails with Ruby China mirror
 # Install rbenv to /opt/rbenv to avoid being overwritten by volume mounts
 ENV RBENV_ROOT=/opt/rbenv
+ENV RUBY_VERSION=4.0.2
+ENV RUBY_GEM_ABI=4.0.0
 ENV PATH=$RBENV_ROOT/bin:$RBENV_ROOT/shims:$PATH
 
 # Install Ruby dependencies
@@ -142,16 +158,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install rbenv and ruby-build to /opt/rbenv (system path, not affected by volume mounts)
-RUN git clone https://github.com/rbenv/rbenv.git /opt/rbenv \
-    && git clone https://github.com/rbenv/ruby-build.git /opt/rbenv/plugins/ruby-build
+RUN git clone --depth 1 https://github.com/rbenv/rbenv.git /opt/rbenv \
+    && git clone --depth 1 https://github.com/rbenv/ruby-build.git /opt/rbenv/plugins/ruby-build \
+    && chown -R coder:coder /opt/rbenv
 
 # Install latest stable Ruby and Rails
-RUN /opt/rbenv/plugins/ruby-build/install.sh \
-    && rbenv install 3.4.4 \
-    && rbenv global 3.4.4 \
+RUN sudo -u coder env RUBY_VERSION=${RUBY_VERSION} bash -lc 'set -euo pipefail \
+    && export RBENV_ROOT=/opt/rbenv \
+    && export PATH="$RBENV_ROOT/bin:$RBENV_ROOT/shims:$PATH" \
+    && /opt/rbenv/plugins/ruby-build/install.sh \
+    && rbenv install "$RUBY_VERSION" \
+    && rbenv global "$RUBY_VERSION" \
     && rbenv rehash \
     && gem install bundler rails --no-document \
-    && rbenv rehash
+    && rbenv rehash'
 
 # Configure gem mirror
 RUN echo "---\n:sources:\n  - https://gems.ruby-china.com/" > /home/coder/.gemrc
@@ -175,7 +195,8 @@ RUN echo '\n\
 export PATH=/opt/go-tools/bin:/opt/rbenv/bin:/opt/rbenv/shims:/opt/temurin-21-jdk/bin:/opt/conda/bin:/usr/local/go/bin:/home/coder/go/bin:$PATH\n\
 \n\
 # User-installed gem executables path\n\
-export PATH=/home/coder/.local/share/gem/ruby/3.4.0/bin:$PATH\n\
+export RUBY_GEM_ABI=${RUBY_GEM_ABI:-4.0.0}\n\
+export PATH=/home/coder/.local/share/gem/ruby/${RUBY_GEM_ABI}/bin:$PATH\n\
 \n\
 # Initialize rbenv\n\
 if [ -x /opt/rbenv/bin/rbenv ]; then\n\
@@ -228,16 +249,8 @@ RUN cp /opt/dev-configs/gemrc /home/coder/.gemrc \
     && cp /opt/dev-configs/pip.conf /home/coder/.config/pip/pip.conf \
     && cat /opt/dev-configs/bashrc-append.sh >> /home/coder/.bashrc
 
-# conda config - Miniforge uses conda-forge by default (no Anaconda ToS)
-RUN /opt/conda/bin/conda config --set show_channel_urls yes
-
 # Set ownership for coder user
-RUN chown -R coder:coder /home/coder \
-    && chown -R coder:coder /opt/conda \
-    && chown -R coder:coder /opt/go-tools \
-    && chown -R coder:coder /opt/rbenv/versions \
-    && chown -R coder:coder /opt/rbenv/shims \
-    && chown coder:coder /opt/rbenv/version
+RUN chown -R coder:coder /home/coder
 
 # Create entrypoint script that initializes home directory on container start
 # This ensures configs are properly set when /home/coder is mounted externally

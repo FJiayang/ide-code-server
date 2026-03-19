@@ -27,12 +27,12 @@ ide-code-server/
 ## What the Image Installs
 
 ### Language runtimes
-- Go `1.24.0`
+- Go `1.26.1`
 - Python `3.13` (Miniforge/conda)
 - Node.js `22` LTS
 - JDK `21` (Temurin)
 - Maven `3.9.11`
-- Ruby `3.4.4` via `rbenv`
+- Ruby `4.0.2` via `rbenv`
 
 ### Core tools
 - System: `git`, `curl`, `wget`, `vim`, `tmux`, `dnsutils`, `yq`, `kubectl`, `sudo`

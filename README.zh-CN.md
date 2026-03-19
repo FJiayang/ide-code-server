@@ -177,11 +177,11 @@ docker run -d \
 
 | 语言 | 版本 | 工具 | 镜像 |
 |----------|---------|-------|--------|
-| Go | 1.24.0 | gopls, delve, golangci-lint | goproxy.cn |
+| Go | 1.26.1 | gopls, delve, golangci-lint | goproxy.cn |
 | Python | 3.13 | uv, conda | pypi.tuna.tsinghua.edu.cn |
 | Node.js | 22 LTS | npm, pnpm, yarn | npmmirror |
 | JDK | 21 | Maven 3.9.11 | Aliyun |
-| Ruby | 3.4.4 | Rails, Bundler | Ruby China |
+| Ruby | 4.0.2 | Rails, Bundler | Ruby China |
 
 ## 构建
 

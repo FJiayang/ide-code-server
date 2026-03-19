@@ -54,6 +54,7 @@ jobs:
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=short
+            type=raw,value=${{ github.sha }}
             type=raw,value=${{ env.DATE_TAG }}
 
       - name: Build and push by digest
@@ -124,6 +125,7 @@ jobs:
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=short
+            type=raw,value=${{ github.sha }}
             type=raw,value=${{ env.DATE_TAG }}
 
       - name: Create manifest list and push
@@ -168,9 +170,6 @@ jobs:
         run: |
           echo "IMAGE_NAME=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
-      - name: Get current date for tagging
-        run: echo "DATE_TAG=$(date +'%Y%m%d')" >> $GITHUB_ENV
-
       - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:
@@ -179,10 +178,10 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull image
-        run: docker pull ${{ env.IMAGE_NAME }}:${{ env.DATE_TAG }}
+        run: docker pull ${{ env.IMAGE_NAME }}:${{ github.sha }}
 
       - name: Start test container
-        run: docker run -d --name test-container ${{ env.IMAGE_NAME }}:${{ env.DATE_TAG }} sleep 600
+        run: docker run -d --name test-container ${{ env.IMAGE_NAME }}:${{ github.sha }} sleep 600
 
       - name: Test default user is coder
         timeout-minutes: 1
@@ -275,7 +274,8 @@ jobs:
           if docker exec test-container bash -c "sudo su - root" 2>&1 | grep -q "sudo: su: command not found\|Sorry, user coder is not allowed to execute"; then
             echo "✓ su command is properly blocked"
           else
-            echo "::warning::su command might not be properly blocked"
+            echo "::error::su command is not blocked as expected"
+            exit 1
           fi
 
       - name: Test mirror configurations

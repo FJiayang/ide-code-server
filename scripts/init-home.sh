@@ -7,13 +7,14 @@ set -e
 HOME_DIR="${HOME_DIR:-/home/coder}"
 CONFIG_TEMPLATES="${CONFIG_TEMPLATES:-/opt/dev-configs}"
 RBENV_ROOT="${RBENV_ROOT:-/opt/rbenv}"
+RUBY_GEM_ABI="${RUBY_GEM_ABI:-4.0.0}"
 
 # Create necessary directories
 echo "Creating directories..."
 mkdir -p "$HOME_DIR/project"
 mkdir -p "$HOME_DIR/.local/share/code-server"
 mkdir -p "$HOME_DIR/.local/share/pnpm"
-mkdir -p "$HOME_DIR/.local/share/gem/ruby/3.4.0/bin"
+mkdir -p "$HOME_DIR/.local/share/gem/ruby/$RUBY_GEM_ABI/bin"
 mkdir -p "$HOME_DIR/.m2/repository"
 mkdir -p "$HOME_DIR/.config/pip"
 mkdir -p "$HOME_DIR/.npm"
