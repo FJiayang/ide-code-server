@@ -80,7 +80,7 @@ RUN ARCH=$(dpkg --print-architecture) && \
     elif [ "$ARCH" = "arm64" ]; then CONDA_ARCH="aarch64"; \
     else CONDA_ARCH="$ARCH"; fi && \
     rm -rf /tmp/conda /opt/conda \
-    curl -fsSL https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-${CONDA_ARCH}.sh -o /tmp/miniforge.sh \
+    && curl -fsSL https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-${CONDA_ARCH}.sh -o /tmp/miniforge.sh \
     && chmod +x /tmp/miniforge.sh \
     && sudo -u coder bash /tmp/miniforge.sh -b -p /tmp/conda \
     && mv /tmp/conda /opt/conda \
