@@ -61,11 +61,11 @@ RUN ARCH=$(dpkg --print-architecture) \
     && go version
 
 # Install Go tools to /opt/go-tools (not affected by volume mounts on /home/coder)
-RUN install -d -o coder -g coder /opt/go-tools \
-    && sudo -u coder env GOPATH=/opt/go-tools GOPROXY=${GOPROXY} /usr/local/go/bin/go install golang.org/x/tools/gopls@latest \
-    && sudo -u coder env GOPATH=/opt/go-tools GOPROXY=${GOPROXY} /usr/local/go/bin/go install github.com/go-delve/delve/cmd/dlv@latest \
-    && sudo -u coder env GOPATH=/opt/go-tools GOPROXY=${GOPROXY} /usr/local/go/bin/go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest \
-    && sudo -u coder env GOPATH=/opt/go-tools GOPROXY=${GOPROXY} /usr/local/go/bin/go install golang.org/x/tools/cmd/goimports@latest
+RUN mkdir -p /opt/go-tools \
+    && GOPATH=/opt/go-tools GOPROXY=${GOPROXY} /usr/local/go/bin/go install golang.org/x/tools/gopls@latest \
+    && GOPATH=/opt/go-tools GOPROXY=${GOPROXY} /usr/local/go/bin/go install github.com/go-delve/delve/cmd/dlv@latest \
+    && GOPATH=/opt/go-tools GOPROXY=${GOPROXY} /usr/local/go/bin/go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest \
+    && GOPATH=/opt/go-tools GOPROXY=${GOPROXY} /usr/local/go/bin/go install golang.org/x/tools/cmd/goimports@latest
 
 # Create symlinks for go commands (ensures availability even when PATH is reset)
 RUN ln -s /usr/local/go/bin/go /usr/local/bin/go \
@@ -79,18 +79,17 @@ RUN ARCH=$(dpkg --print-architecture) && \
     if [ "$ARCH" = "amd64" ]; then CONDA_ARCH="x86_64"; \
     elif [ "$ARCH" = "arm64" ]; then CONDA_ARCH="aarch64"; \
     else CONDA_ARCH="$ARCH"; fi && \
-    rm -rf /tmp/conda /opt/conda \
+    rm -rf /opt/conda \
     && curl -fsSL https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-${CONDA_ARCH}.sh -o /tmp/miniforge.sh \
     && chmod +x /tmp/miniforge.sh \
-    && sudo -u coder bash /tmp/miniforge.sh -b -p /tmp/conda \
-    && mv /tmp/conda /opt/conda \
+    && bash /tmp/miniforge.sh -b -p /opt/conda \
     && rm /tmp/miniforge.sh
 ENV PATH=/opt/conda/bin:$PATH
 
 # Install Python 3.13 via conda-forge and create symlinks
-RUN sudo -u coder /opt/conda/bin/conda install -y python=3.13 \
-    && sudo -u coder /opt/conda/bin/conda config --set show_channel_urls yes \
-    && sudo -u coder /opt/conda/bin/conda clean -afy \
+RUN /opt/conda/bin/conda install -y python=3.13 \
+    && /opt/conda/bin/conda config --set show_channel_urls yes \
+    && /opt/conda/bin/conda clean -afy \
     && ln -sf /opt/conda/bin/python /usr/bin/python3 \
     && ln -sf /opt/conda/bin/python /usr/bin/python \
     && ln -sf /opt/conda/bin/pip /usr/bin/pip3 \
@@ -160,19 +159,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install rbenv and ruby-build to /opt/rbenv (system path, not affected by volume mounts)
 RUN git clone --depth 1 https://github.com/rbenv/rbenv.git /opt/rbenv \
-    && git clone --depth 1 https://github.com/rbenv/ruby-build.git /opt/rbenv/plugins/ruby-build \
-    && chown -R coder:coder /opt/rbenv
+    && git clone --depth 1 https://github.com/rbenv/ruby-build.git /opt/rbenv/plugins/ruby-build
 
 # Install latest stable Ruby and Rails
-RUN sudo -u coder env RUBY_VERSION=${RUBY_VERSION} bash -lc 'set -euo pipefail \
-    && export RBENV_ROOT=/opt/rbenv \
-    && export PATH="$RBENV_ROOT/bin:$RBENV_ROOT/shims:$PATH" \
-    && /opt/rbenv/plugins/ruby-build/install.sh \
+RUN /opt/rbenv/plugins/ruby-build/install.sh \
     && rbenv install "$RUBY_VERSION" \
     && rbenv global "$RUBY_VERSION" \
     && rbenv rehash \
     && gem install bundler rails --no-document \
-    && rbenv rehash'
+    && rbenv rehash
 
 # Configure gem mirror
 RUN echo "---\n:sources:\n  - https://gems.ruby-china.com/" > /home/coder/.gemrc
