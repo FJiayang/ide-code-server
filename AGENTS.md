@@ -1,243 +1,141 @@
-# IDE Code Server - 项目上下文
+# AGENTS.md - IDE Code Server
 
-## 项目概述
+## Purpose
+This file helps any incoming agent understand this repository quickly and make safe, consistent changes.
 
-这是一个基于 `codercom/code-server` 构建的综合性开发环境 Docker 镜像项目，预配置了多种编程语言运行时和中国大陆镜像加速。目标是为开发者提供一个开箱即用的云端 IDE 环境。
+## Project Snapshot
+- Project type: Docker image for a cloud IDE based on `codercom/code-server:latest`
+- Primary goal: deliver an out-of-the-box development environment with common languages/tools and China-mainland mirrors
+- Default runtime user: `coder` (passwordless `sudo`, `su` explicitly blocked)
+- Entrypoint: custom `/entrypoint.sh` that runs home initialization before starting `code-server`
 
-### 核心特性
-
-- **基础镜像**: `codercom/code-server:latest`
-- **用户权限**: `coder` 用户，支持无密码 sudo（已禁用 su 命令）
-- **多语言支持**: Go、Python 3.13、Node.js 22 LTS、JDK 21、Ruby 3.4.1
-- **开发工具**: git、curl、wget、vim、dnsutils (nslookup)、yq、kubectl、gopls、delve、golangci-lint、uv、conda、pnpm、yarn、Maven、Rails
-- **镜像加速**: 所有语言包管理器均配置中国大陆镜像源
-
-## 项目结构
-
-```
+## Repository Layout
+```text
 ide-code-server/
-├── Dockerfile                              # 主构建文件（多层单阶段构建）
-├── README.md                               # 使用文档
-├── .dockerignore                           # Docker 构建排除文件
+├── Dockerfile
+├── README.md
+├── AGENTS.md
+├── scripts/
+│   └── init-home.sh
 ├── .github/
 │   └── workflows/
-│       └── build-and-push.yml              # CI/CD 多架构构建流程
+│       └── build-and-push.yml
 └── docs/
-    └── plans/                              # 设计与规划文档
-        ├── 2026-03-02-ide-code-server-design.md
-        └── 2026-03-02-ide-code-server.md
+    └── plans/
 ```
 
-## 构建与部署
+## What the Image Installs
 
-### 本地构建
+### Language runtimes
+- Go `1.24.0`
+- Python `3.13` (Miniforge/conda)
+- Node.js `22` LTS
+- JDK `21` (Temurin)
+- Maven `3.9.11`
+- Ruby `3.4.4` via `rbenv`
 
+### Core tools
+- System: `git`, `curl`, `wget`, `vim`, `tmux`, `dnsutils`, `yq`, `kubectl`, `sudo`
+- Go tools: `gopls`, `dlv`, `golangci-lint`, `goimports`
+- Python tools: `uv`, `conda`
+- Node tools: `pnpm`, `yarn`, `@iflow-ai/iflow-cli`, `@anthropic-ai/claude-code`
+- Ruby tools: `bundler`, `rails`
+
+## Dockerfile Design (Layered for Cache Efficiency)
+| Layer | Main content |
+|---|---|
+| 1 | Base system tools |
+| 2 | User permissions/sudo policy |
+| 3 | Go + Go dev tools |
+| 4 | Python + uv + conda |
+| 5 | Node.js + package managers/CLIs |
+| 6 | JDK + Maven |
+| 7 | Ruby + rbenv + Rails |
+| 8 | Home templates, PATH/bootstrap, entrypoint, mount-friendly defaults |
+
+The layering order is intentional. Keep low-churn dependencies in earlier layers.
+
+## Startup and Mount Behavior (Critical)
+- `ENTRYPOINT` runs `/opt/dev-configs/init-home.sh` on every container start.
+- This is required because users often bind-mount `/home/coder` or its subdirectories.
+- `scripts/init-home.sh` ensures required directories/config files exist.
+- It also protects Ruby shell initialization compatibility:
+  - Creates `~/.rbenv -> /opt/rbenv` symlink if missing.
+  - Migrates legacy `.bashrc` entries from `/home/coder/.rbenv` to `/opt/rbenv`.
+
+If you modify shell bootstrap behavior, update both:
+- Docker template generation in `Dockerfile` (`/opt/dev-configs/bashrc-append.sh`)
+- Runtime reconciliation logic in `scripts/init-home.sh`
+
+## Mirror/Registry Configuration
+| Ecosystem | Mirror/Registry |
+|---|---|
+| Go | `https://goproxy.cn` |
+| pip/uv | `https://pypi.tuna.tsinghua.edu.cn/simple` |
+| npm/pnpm/yarn | `https://registry.npmmirror.com` |
+| Maven | Aliyun public repository mirror |
+| RubyGems | `https://gems.ruby-china.com/` |
+
+## CI/CD Pipeline Summary
+Workflow: `.github/workflows/build-and-push.yml`
+
+- Triggers:
+  - Push to `master`
+  - Manual dispatch
+- Build strategy:
+  - Matrix build on `linux/amd64` and `linux/arm64`
+  - Push per-platform images by digest
+  - Merge job creates a multi-arch manifest
+- Tags:
+  - `latest` (default branch only)
+  - short SHA
+  - date tag (`YYYYMMDD`)
+- Registry:
+  - GHCR (`ghcr.io/<owner>/<repo>`, forced lowercase in workflow)
+- Post-merge test job validates:
+  - default user
+  - major tool availability in `bash -i` (simulates VS Code terminal)
+  - sudo policy and mirror config
+
+## Agent Change Guide
+
+### If you add/remove a tool
+1. Update `Dockerfile`.
+2. Update human docs: `README.md`.
+3. Update this file (`AGENTS.md`) so future agents stay aligned.
+4. Check CI tool-access test section in `.github/workflows/build-and-push.yml` and add/update relevant assertions.
+
+### If you change language versions
+1. Update version/env lines in `Dockerfile`.
+2. Update version tables in `README.md` and `AGENTS.md`.
+3. Watch for path/version-coupled shell settings (example: Ruby gem bin path in `.bashrc` template).
+
+### If you change mount/bootstrap logic
+1. Keep `Dockerfile` templates and `scripts/init-home.sh` in sync.
+2. Preserve compatibility with existing mounted home directories.
+3. Avoid assumptions that `/home/coder` contents are fresh.
+
+## Local Validation Checklist
+Use these when Docker is available:
 ```bash
-# 构建镜像
-docker build -t ide-code-server .
-
-# 本地运行（最小配置）
-docker run -d \
-  --name ide-code-server \
-  -p 8080:8080 \
-  -v $(pwd)/project:/home/coder/project \
-  -v $(pwd)/code-server:/home/coder/.local/share/code-server \
-  -e PASSWORD=yourpassword \
-  ide-code-server:latest
+docker build -t ide-code-server:test .
+docker run --rm -it ide-code-server:test bash -i -c "whoami"
+docker run --rm -it ide-code-server:test bash -i -c "ruby -v && rails -v && tmux -V"
+docker run --rm -it ide-code-server:test bash -i -c "go version && python3 --version && node --version && java -version"
 ```
 
-### CI/CD 流程
+## Git and Commit Conventions
+- Conventional Commits are preferred:
+  - `feat:`
+  - `fix:`
+  - `docs:`
+  - `chore:`
+  - `refactor:`
+  - `test:`
+- Main integration branch is `master`.
 
-项目使用 GitHub Actions 实现自动化构建和发布：
-
-- **触发条件**: 推送到 `master` 分支 或手动触发
-- **构建平台**: `linux/amd64`, `linux/arm64`（并行构建）
-- **镜像仓库**: GitHub Container Registry (`ghcr.io`)
-- **标签策略**:
-  - `latest` - 最新版本（仅 master 分支）
-  - `sha-xxxxxx` - 短提交哈希
-  - `YYYYMMDD` - 日期标签
-
-### 多架构构建策略
-
-使用 matrix 策略实现并行多平台构建：
-1. 各平台独立构建并推送 digest
-2. 合并阶段创建多架构 manifest
-3. 最终镜像支持 `linux/amd64` 和 `linux/arm64`
-
-## Dockerfile 分层结构
-
-Dockerfile 采用精心设计的分层结构以优化缓存效率：
-
-| 层 | 内容 | 缓存优化考虑 |
-|---|------|-------------|
-| Layer 1 | 系统工具 (git, curl, wget, vim, dnsutils, yq, kubectl) | 变更频率最低 |
-| Layer 2 | 用户权限配置 (sudo) | 基础配置 |
-| Layer 3 | Go 1.24.0 + gopls + delve + golangci-lint | 独立语言环境 |
-| Layer 4 | Python 3.13 + uv + Miniforge (conda) | 独立语言环境 |
-| Layer 5 | Node.js 22 LTS + npm/pnpm/yarn | 独立语言环境 |
-| Layer 6 | JDK 21 (Temurin) + Maven 3.9.11 | 独立语言环境 |
-| Layer 7 | Ruby 3.4.1 (rbenv) + Rails | 独立语言环境 |
-| Layer 8 | 目录结构 + 镜像配置文件 | 变更频率最高 |
-
-## 镜像源配置
-
-所有包管理器均已配置中国大陆镜像加速：
-
-| 语言/工具 | 镜像源 | 配置位置 |
-|----------|--------|----------|
-| Go | goproxy.cn | 环境变量 `GOPROXY` |
-| Python (pip/uv) | pypi.tuna.tsinghua.edu.cn | `~/.config/pip/pip.conf`, 环境变量 `UV_INDEX_URL` |
-| conda | conda-forge (默认) | Miniforge 默认配置 |
-| Node.js (npm/pnpm/yarn) | npmmirror | `~/.npmrc` |
-| Maven | 阿里云 | `~/.m2/settings.xml` |
-| Ruby (gem) | Ruby China | `~/.gemrc` |
-
-## 容器内目录结构
-
-```
-/home/coder/
-├── project/                              # 工作区（主要挂载点）
-├── .local/share/code-server/             # VS Code 扩展和用户数据
-├── .local/share/pnpm/                    # pnpm 包存储
-├── .m2/
-│   ├── settings.xml                      # Maven 配置
-│   └── repository/                       # Maven 本地仓库
-├── .npm/                                 # npm 缓存
-├── .npmrc                                # npm 配置
-├── .gemrc                                # gem 配置
-├── .config/pip/pip.conf                  # pip 配置
-├── .cache/
-│   ├── uv/                               # uv 缓存
-│   └── pip/                              # pip 缓存
-├── go/                                   # Go GOPATH（用户安装的包）
-└── .rbenv/                               # Ruby 版本管理
-```
-
-## 外部挂载支持
-
-为提升开发体验，以下目录支持外部挂载以实现数据持久化：
-
-| 容器路径 | 用途 | 挂载优势 |
-|----------|------|----------|
-| `/home/coder/project` | 工作区 | 代码持久化 |
-| `/home/coder/.local/share/code-server` | VS Code 数据 | 扩展和设置持久化 |
-| `/home/coder/.npm` | npm 缓存 | 避免重复下载 |
-| `/home/coder/.local/share/pnpm` | pnpm 存储 | 共享包存储 |
-| `/home/coder/go` | Go 包 | 持久化 go install 的包 |
-| `/home/coder/.cache/uv` | uv 缓存 | Python 包缓存 |
-| `/home/coder/.cache/pip` | pip 缓存 | pip 包缓存 |
-| `/home/coder/.m2/repository` | Maven 仓库 | Java 依赖缓存 |
-
-### 推荐挂载配置
-
-```bash
-docker run -d \
-  --name ide-code-server \
-  -p 8080:8080 \
-  -v $(pwd)/project:/home/coder/project \
-  -v $(pwd)/code-server:/home/coder/.local/share/code-server \
-  -v $(pwd)/npm:/home/coder/.npm \
-  -v $(pwd)/go:/home/coder/go \
-  -e PASSWORD=yourpassword \
-  ghcr.io/fjiayang/ide-code-server:latest
-```
-
-## 开发约定
-
-### Dockerfile 编写规范
-
-1. **分层原则**: 按变更频率从低到高排列层，优化构建缓存
-2. **清理缓存**: 每个 `apt-get` 或 `curl` 安装后清理缓存文件
-3. **架构支持**: 使用 `$(dpkg --print-architecture)` 动态检测架构
-4. **用户切换**: 在 Dockerfile 末尾切换回 `coder` 用户
-
-### Git 提交规范
-
-使用 Conventional Commits 格式：
-
-- `feat:` 新功能
-- `fix:` Bug 修复
-- `docs:` 文档更新
-- `chore:` 杂项（构建配置等）
-
-### CI/CD 注意事项
-
-- 镜像名称必须小写（GHCR 要求）
-- 使用 `visudo -c` 验证 sudoers 配置语法
-- 多架构构建需要矩阵策略和 manifest 合并
-
-### Git 工作流
-
-项目使用以下 Git 工作流程：
-
-#### 分支策略
-
-- `master` - 主分支，受保护，通过 PR 合并
-- 功能开发：直接在 `master` 分支提交或创建 feature 分支
-
-#### 日常开发流程
-
-```bash
-# 1. 拉取最新代码
-git pull origin master
-
-# 2. 查看当前状态
-git status
-
-# 3. 添加修改的文件
-git add <files>
-# 或添加所有更改
-git add -A
-
-# 4. 提交（使用 Conventional Commits 格式）
-git commit -m "feat: 添加 vim 和 dnsutils 工具"
-git commit -m "fix: 修复 ruby 命令找不到的问题"
-git commit -m "docs: 更新文档"
-
-# 5. 推送到远程
-git push origin master
-```
-
-#### 提交类型规范
-
-| 类型 | 说明 | 示例 |
-|-----|------|------|
-| `feat` | 新功能 | `feat: 添加 vim 编辑器支持` |
-| `fix` | Bug 修复 | `fix: 修复容器内 ruby 命令无法识别` |
-| `docs` | 文档更新 | `docs: 更新 README 工具列表` |
-| `chore` | 构建/工具变更 | `chore: 升级 Go 版本到 1.24` |
-| `refactor` | 代码重构 | `refactor: 优化 Dockerfile 分层结构` |
-| `test` | 测试相关 | `test: 添加构建验证测试` |
-
-#### CI/CD 自动触发
-
-- 推送到 `master` 分支自动触发构建
-- 构建成功后自动推送到 `ghcr.io`
-- 生成 `latest`、`sha-xxxxxx`、`YYYYMMDD` 三种标签
-
-## 快速参考命令
-
-```bash
-# 查看镜像构建历史
-docker history ide-code-server:latest
-
-# 进入容器调试
-docker run -it --rm ide-code-server:latest bash
-
-# 查看多架构镜像信息
-docker buildx imagetools inspect ghcr.io/fjiayang/ide-code-server:latest
-
-# 本地构建特定平台
-docker buildx build --platform linux/amd64 -t ide-code-server:amd64 .
-
-# 手动触发 CI 构建
-gh workflow run build-and-push.yml
-```
-
-## 相关链接
-
-- [code-server 官方文档](https://coder.com/docs/code-server/latest)
-- [Eclipse Temurin JDK](https://adoptium.net/)
-- [Miniforge (conda-forge)](https://github.com/conda-forge/miniforge)
-- [uv Python 包管理器](https://docs.astral.sh/uv/)
+## Key Risk Areas
+- Shell startup regressions (especially VS Code integrated terminal behavior)
+- PATH order changes that hide installed tools
+- Volume-mount edge cases under `/home/coder`
+- Multi-arch build breaks caused by architecture-specific binary URLs

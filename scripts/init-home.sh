@@ -4,8 +4,9 @@
 
 set -e
 
-HOME_DIR="/home/coder"
-CONFIG_TEMPLATES="/opt/dev-configs"
+HOME_DIR="${HOME_DIR:-/home/coder}"
+CONFIG_TEMPLATES="${CONFIG_TEMPLATES:-/opt/dev-configs}"
+RBENV_ROOT="${RBENV_ROOT:-/opt/rbenv}"
 
 # Create necessary directories
 echo "Creating directories..."
@@ -20,6 +21,11 @@ mkdir -p "$HOME_DIR/.cache/uv"
 mkdir -p "$HOME_DIR/.cache/pip"
 mkdir -p "$HOME_DIR/go"
 
+# Keep compatibility with old ~/.bashrc entries that point to /home/coder/.rbenv
+if [ ! -e "$HOME_DIR/.rbenv" ]; then
+    ln -s "$RBENV_ROOT" "$HOME_DIR/.rbenv"
+fi
+
 # Initialize .bashrc if needed
 BASHRC_FILE="$HOME_DIR/.bashrc"
 if [ -f "$BASHRC_FILE" ]; then
@@ -31,6 +37,15 @@ if [ -f "$BASHRC_FILE" ]; then
 else
     echo "Creating .bashrc..."
     cp "$CONFIG_TEMPLATES/bashrc-append.sh" "$BASHRC_FILE"
+fi
+
+# Migrate legacy rbenv path in existing shell config
+if grep -q "/home/coder/.rbenv" "$BASHRC_FILE"; then
+    echo "Migrating legacy rbenv path in .bashrc..."
+    TMP_BASHRC="$(mktemp)"
+    sed "s|/home/coder/.rbenv|$RBENV_ROOT|g" "$BASHRC_FILE" > "$TMP_BASHRC"
+    cat "$TMP_BASHRC" > "$BASHRC_FILE"
+    rm -f "$TMP_BASHRC"
 fi
 
 # Initialize .gemrc if not exists

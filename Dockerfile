@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     vim \
+    tmux \
     dnsutils \
     ca-certificates \
     gnupg \
@@ -94,7 +95,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
 
 # Configure npm mirror and install pnpm, yarn, iflow-cli, claude-code
 RUN npm config set registry https://registry.npmmirror.com --global \
-    && npm install -g pnpm yarn @iflow-ai/iflow-cli@latest @anthropic-ai/claude-code@2.1.41 \
+    && npm install -g pnpm yarn @iflow-ai/iflow-cli@latest @anthropic-ai/claude-code@latest \
     && pnpm config set registry https://registry.npmmirror.com \
     && yarn config set registry https://registry.npmmirror.com
 
@@ -177,7 +178,9 @@ export PATH=/opt/go-tools/bin:/opt/rbenv/bin:/opt/rbenv/shims:/opt/temurin-21-jd
 export PATH=/home/coder/.local/share/gem/ruby/3.4.0/bin:$PATH\n\
 \n\
 # Initialize rbenv\n\
-eval "$(/opt/rbenv/bin/rbenv init - bash)"' > /opt/dev-configs/bashrc-append.sh
+if [ -x /opt/rbenv/bin/rbenv ]; then\n\
+  eval "$(/opt/rbenv/bin/rbenv init - bash)"\n\
+fi' > /opt/dev-configs/bashrc-append.sh
 
 # gemrc template
 RUN echo '---\n:sources:\n  - https://gems.ruby-china.com/' > /opt/dev-configs/gemrc

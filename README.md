@@ -1,5 +1,7 @@
 # IDE Code Server
 
+[English](./README.md) | [简体中文](./README.zh-CN.md)
+
 A comprehensive development environment Docker image based on code-server, pre-configured with multiple programming language runtimes and China mainland mirror acceleration.
 
 ## Features
@@ -7,7 +9,7 @@ A comprehensive development environment Docker image based on code-server, pre-c
 - **Base**: codercom/code-server:latest
 - **User**: `coder` with passwordless sudo (su blocked)
 - **Languages**: Go, Python 3.13, Node.js, JDK 21, Ruby/Rails
-- **Tools**: git, curl, wget, vim, dnsutils (nslookup), yq, kubectl, gopls, uv, conda, pnpm, yarn, Maven, iflow-cli, claude-code
+- **Tools**: git, curl, wget, vim, tmux, dnsutils (nslookup), yq, kubectl, gopls, delve, uv, conda, pnpm, yarn, Maven, iflow-cli, claude-code
 
 ## Quick Start
 
@@ -151,12 +153,13 @@ When `/home/coder` is mounted (especially as an empty directory), the container 
 
 | File | Purpose |
 |------|---------|
-| `.bashrc` | PATH restoration and rbenv initialization |
+| `.bashrc` | PATH restoration, rbenv initialization, and legacy rbenv path migration |
 | `.gemrc` | Ruby China mirror configuration |
 | `.m2/settings.xml` | Maven Aliyun mirror configuration |
 | `.config/pip/pip.conf` | pip Tsinghua mirror configuration |
 
 Required directories are also created automatically.
+Legacy shell entries that reference `/home/coder/.rbenv` are automatically migrated to `/opt/rbenv` during startup.
 
 ### System Tools (Not Affected by Mounts)
 
