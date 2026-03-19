@@ -75,14 +75,15 @@ RUN ln -s /usr/local/go/bin/go /usr/local/bin/go \
 ENV UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 
 # Install Miniforge (conda-forge based, no Anaconda ToS required)
-RUN install -d -o coder -g coder /opt/conda \
-    && ARCH=$(dpkg --print-architecture) && \
+RUN ARCH=$(dpkg --print-architecture) && \
     if [ "$ARCH" = "amd64" ]; then CONDA_ARCH="x86_64"; \
     elif [ "$ARCH" = "arm64" ]; then CONDA_ARCH="aarch64"; \
     else CONDA_ARCH="$ARCH"; fi && \
+    rm -rf /tmp/conda /opt/conda \
     curl -fsSL https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-${CONDA_ARCH}.sh -o /tmp/miniforge.sh \
     && chmod +x /tmp/miniforge.sh \
-    && sudo -u coder bash /tmp/miniforge.sh -b -p /opt/conda \
+    && sudo -u coder bash /tmp/miniforge.sh -b -p /tmp/conda \
+    && mv /tmp/conda /opt/conda \
     && rm /tmp/miniforge.sh
 ENV PATH=/opt/conda/bin:$PATH
 
