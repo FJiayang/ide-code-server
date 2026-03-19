@@ -62,10 +62,10 @@ RUN ARCH=$(dpkg --print-architecture) \
 
 # Install Go tools to /opt/go-tools (not affected by volume mounts on /home/coder)
 RUN install -d -o coder -g coder /opt/go-tools \
-    && sudo -u coder env GOPATH=/opt/go-tools go install golang.org/x/tools/gopls@latest \
-    && sudo -u coder env GOPATH=/opt/go-tools go install github.com/go-delve/delve/cmd/dlv@latest \
-    && sudo -u coder env GOPATH=/opt/go-tools go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest \
-    && sudo -u coder env GOPATH=/opt/go-tools go install golang.org/x/tools/cmd/goimports@latest
+    && sudo -u coder env GOPATH=/opt/go-tools GOPROXY=${GOPROXY} /usr/local/go/bin/go install golang.org/x/tools/gopls@latest \
+    && sudo -u coder env GOPATH=/opt/go-tools GOPROXY=${GOPROXY} /usr/local/go/bin/go install github.com/go-delve/delve/cmd/dlv@latest \
+    && sudo -u coder env GOPATH=/opt/go-tools GOPROXY=${GOPROXY} /usr/local/go/bin/go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest \
+    && sudo -u coder env GOPATH=/opt/go-tools GOPROXY=${GOPROXY} /usr/local/go/bin/go install golang.org/x/tools/cmd/goimports@latest
 
 # Create symlinks for go commands (ensures availability even when PATH is reset)
 RUN ln -s /usr/local/go/bin/go /usr/local/bin/go \
