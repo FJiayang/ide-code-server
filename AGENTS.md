@@ -38,7 +38,7 @@ ide-code-server/
 - System: `git`, `curl`, `wget`, `vim`, `tmux`, `dnsutils`, `yq`, `kubectl`, `sudo`
 - Go tools: `gopls`, `dlv`, `golangci-lint`, `goimports`
 - Python tools: `uv`, `conda`
-- Node tools: `pnpm`, `yarn`, `@iflow-ai/iflow-cli`, `@anthropic-ai/claude-code`
+- Node tools: `pnpm`, `yarn`, `@anthropic-ai/claude-code`
 - Ruby tools: `bundler`, `rails`
 
 ## Dockerfile Design (Layered for Cache Efficiency)

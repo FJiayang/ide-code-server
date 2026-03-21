@@ -9,7 +9,7 @@
 - **基础镜像**: `codercom/code-server:latest`
 - **默认用户**: `coder`（免密 sudo，`su` 被禁用）
 - **语言环境**: Go、Python 3.13、Node.js、JDK 21、Ruby/Rails
-- **开发工具**: git、curl、wget、vim、tmux、dnsutils (nslookup)、yq、kubectl、gopls、delve、uv、conda、pnpm、yarn、Maven、iflow-cli、claude-code
+- **开发工具**: git、curl、wget、vim、tmux、dnsutils (nslookup)、yq、kubectl、gopls、delve、uv、conda、pnpm、yarn、Maven、claude-code
 
 ## 快速开始
 

@@ -9,7 +9,7 @@ A comprehensive development environment Docker image based on code-server, pre-c
 - **Base**: codercom/code-server:latest
 - **User**: `coder` with passwordless sudo (su blocked)
 - **Languages**: Go, Python 3.13, Node.js, JDK 21, Ruby/Rails
-- **Tools**: git, curl, wget, vim, tmux, dnsutils (nslookup), yq, kubectl, gopls, delve, uv, conda, pnpm, yarn, Maven, iflow-cli, claude-code
+- **Tools**: git, curl, wget, vim, tmux, dnsutils (nslookup), yq, kubectl, gopls, delve, uv, conda, pnpm, yarn, Maven, claude-code
 
 ## Quick Start
 
