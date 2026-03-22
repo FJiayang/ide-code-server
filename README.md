@@ -10,6 +10,7 @@ A comprehensive development environment Docker image based on code-server, pre-c
 - **User**: `coder` with passwordless sudo (su blocked)
 - **Languages**: Go, Python 3.13, Node.js, JDK 21, Ruby/Rails
 - **Tools**: git, curl, wget, vim, tmux, dnsutils (nslookup), yq, kubectl, gopls, delve, uv, conda, pnpm, yarn, Maven, claude-code
+- **Middleware Clients**: MySQL CLI, PostgreSQL CLI (psql), Redis CLI, Docker CLI, Kafka CLI
 
 ## Quick Start
 
@@ -172,6 +173,7 @@ The following components are installed in system directories and remain availabl
 | Python/conda | `/opt/conda` | python, pip, conda |
 | JDK | `/opt/temurin-21-jdk` | java, javac, jar |
 | Maven | `/opt/apache-maven` | mvn |
+| Kafka | `/opt/kafka` | kafka-topics, kafka-console-consumer, kafka-console-producer |
 
 ## Installed Languages
 

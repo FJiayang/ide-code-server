@@ -174,13 +174,57 @@ RUN /opt/rbenv/plugins/ruby-build/install.sh \
 # Configure gem mirror
 RUN echo "---\n:sources:\n  - https://gems.ruby-china.com/" > /home/coder/.gemrc
 
-# Layer 8: Directory structure and config files
+# Layer 8: Database and Middleware Clients
+
+# PostgreSQL client (official PostgreSQL apt repository)
+RUN mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/keyrings/postgresql-keyring.gpg \
+    && chmod 644 /etc/apt/keyrings/postgresql-keyring.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/postgresql-keyring.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/postgresql.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client-17 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Docker CLI (official Docker apt repository, client only)
+RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
+    && chmod 644 /etc/apt/keyrings/docker.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends docker-ce-cli docker-buildx-plugin docker-compose-plugin \
+    && rm -rf /var/lib/apt/lists/*
+
+# MySQL and Redis clients (Debian standard packages)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    default-mysql-client \
+    redis-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+# Kafka CLI tools
+ENV KAFKA_VERSION=3.9.0
+ENV KAFKA_SCALA_VERSION=2.13
+ENV KAFKA_HOME=/opt/kafka
+
+RUN curl -fsSL "https://archive.apache.org/dist/kafka/${KAFKA_VERSION}/kafka_${KAFKA_SCALA_VERSION}-${KAFKA_VERSION}.tgz" -o /tmp/kafka.tgz \
+    && mkdir -p ${KAFKA_HOME} \
+    && tar -xzf /tmp/kafka.tgz -C ${KAFKA_HOME} --strip-components=1 \
+    && rm -f /tmp/kafka.tgz \
+    && chmod +x ${KAFKA_HOME}/bin/*
+
+# Create symlinks for frequently used Kafka tools
+RUN ln -s ${KAFKA_HOME}/bin/kafka-topics.sh /usr/local/bin/kafka-topics \
+    && ln -s ${KAFKA_HOME}/bin/kafka-console-consumer.sh /usr/local/bin/kafka-console-consumer \
+    && ln -s ${KAFKA_HOME}/bin/kafka-console-producer.sh /usr/local/bin/kafka-console-producer \
+    && ln -s ${KAFKA_HOME}/bin/kafka-consumer-groups.sh /usr/local/bin/kafka-consumer-groups \
+    && ln -s ${KAFKA_HOME}/bin/kafka-configs.sh /usr/local/bin/kafka-configs \
+    && ln -s ${KAFKA_HOME}/bin/kafka-acls.sh /usr/local/bin/kafka-acls
+
+# Layer 9: Directory structure and config files
 # Create system-wide PATH config (not affected by volume mounts on /home/coder)
 # This ensures tools are accessible in all shell types (login/non-login, interactive/non-interactive)
 RUN echo '#!/bin/sh\n\
 # Development tools PATH configuration\n\
 # Note: Symlinks in /usr/local/bin provide fallback, this is additional coverage\n\
-export PATH=/opt/go-tools/bin:/opt/rbenv/bin:/opt/rbenv/shims:/usr/local/go/bin:/home/coder/go/bin:/opt/temurin-21-jdk/bin:/opt/conda/bin:$PATH' > /etc/profile.d/dev-tools.sh \
+export PATH=/opt/kafka/bin:/opt/go-tools/bin:/opt/rbenv/bin:/opt/rbenv/shims:/usr/local/go/bin:/home/coder/go/bin:/opt/temurin-21-jdk/bin:/opt/conda/bin:$PATH' > /etc/profile.d/dev-tools.sh \
     && chmod +x /etc/profile.d/dev-tools.sh
 
 # Create config templates directory (for volume mount compatibility)
@@ -190,7 +234,7 @@ RUN mkdir -p /opt/dev-configs
 # bashrc append content template
 RUN echo '\n\
 # Restore Docker ENV PATH (VS Code terminal resets PATH)\n\
-export PATH=/opt/go-tools/bin:/opt/rbenv/bin:/opt/rbenv/shims:/opt/temurin-21-jdk/bin:/opt/conda/bin:/usr/local/go/bin:/home/coder/go/bin:$PATH\n\
+export PATH=/opt/kafka/bin:/opt/go-tools/bin:/opt/rbenv/bin:/opt/rbenv/shims:/opt/temurin-21-jdk/bin:/opt/conda/bin:/usr/local/go/bin:/home/coder/go/bin:$PATH\n\
 \n\
 # User-installed gem executables path\n\
 export RUBY_GEM_ABI=${RUBY_GEM_ABI:-4.0.0}\n\

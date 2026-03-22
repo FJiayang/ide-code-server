@@ -256,6 +256,13 @@ jobs:
           test_tool "vim" "vim --version | head -1" || FAILED_TOOLS="$FAILED_TOOLS vim"
           test_tool "kubectl" "kubectl version --client --output=json" || FAILED_TOOLS="$FAILED_TOOLS kubectl"
           test_tool "yq" "yq --version" || FAILED_TOOLS="$FAILED_TOOLS yq"
+
+          # Database and Middleware clients
+          test_tool "mysql" "mysql --version" || FAILED_TOOLS="$FAILED_TOOLS mysql"
+          test_tool "psql" "psql --version" || FAILED_TOOLS="$FAILED_TOOLS psql"
+          test_tool "redis-cli" "redis-cli --version" || FAILED_TOOLS="$FAILED_TOOLS redis-cli"
+          test_tool "docker" "docker --version" || FAILED_TOOLS="$FAILED_TOOLS docker"
+          test_tool "kafka-topics" "kafka-topics.sh --version" || FAILED_TOOLS="$FAILED_TOOLS kafka-topics"
           
           if [ -n "$FAILED_TOOLS" ]; then
             echo "::error::The following tools are not accessible:$FAILED_TOOLS"

@@ -10,6 +10,7 @@
 - **默认用户**: `coder`（免密 sudo，`su` 被禁用）
 - **语言环境**: Go、Python 3.13、Node.js、JDK 21、Ruby/Rails
 - **开发工具**: git、curl、wget、vim、tmux、dnsutils (nslookup)、yq、kubectl、gopls、delve、uv、conda、pnpm、yarn、Maven、claude-code
+- **中间件客户端**: MySQL CLI、PostgreSQL CLI (psql)、Redis CLI、Docker CLI、Kafka CLI
 
 ## 快速开始
 
@@ -172,6 +173,7 @@ docker run -d \
 | Python/conda | `/opt/conda` | python, pip, conda |
 | JDK | `/opt/temurin-21-jdk` | java, javac, jar |
 | Maven | `/opt/apache-maven` | mvn |
+| Kafka | `/opt/kafka` | kafka-topics, kafka-console-consumer, kafka-console-producer |
 
 ## 内置语言
 
