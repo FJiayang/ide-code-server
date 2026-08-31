@@ -1,3 +1,5 @@
+
+
 # IDE Code Server
 
 [English](./README.md) | [简体中文](./README.zh-CN.md)
@@ -179,7 +181,7 @@ The following components are installed in system directories and remain availabl
 
 | Language | Version | Tools | Mirror |
 |----------|---------|-------|--------|
-| Go | 1.26.1 | gopls, delve, golangci-lint | goproxy.cn |
+| Go | 1.26.1 | gopls, delve, golangci-lint, goimports | goproxy.cn |
 | Python | 3.13 | uv, conda | pypi.tuna.tsinghua.edu.cn |
 | Node.js | 22 LTS | npm, pnpm, yarn | npmmirror |
 | JDK | 21 | Maven 3.9.11 | Aliyun |
